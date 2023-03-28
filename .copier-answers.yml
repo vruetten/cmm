@@ -1,0 +1,18 @@
+# Do not edit - changes here will be overwritten by Copier
+_commit: v1.0
+_src_path: gh:pydev-guide/pyrepo-copier
+author_email: vms.rutten@gmail.com
+author_name: Virginia M.S. Rutten
+git_versioning: true
+github_username: vrutten
+mode: tooling
+module_name: cmm
+project_license: BSD-3-Clause
+project_name: cmm
+project_short_description: Coherence Mixture Model
+test_pre_release: true
+use_black: true
+use_mypy: true
+use_pre_commit: true
+use_ruff: true
+
