@@ -131,3 +131,31 @@ def _triage_segments(window, nperseg: int, input_length: int):
                     "value specified for nperseg is different" " from length of window"
                 )
     return win, nperseg
+
+
+# def foldxy(carry, x, alltoall):
+#     x0 = x[0]
+#     y0 = x[1]
+#     xn = x0.shape[0]
+#     yn = y0.shape[0]
+#     if alltoall:
+#         tmp0 = broadcast(x0, sizes=(yn,))
+#         tmp1 = broadcast(y0, sizes=(xn,))
+#         tmp0 = tmp0.transpose([1, 0, 2])
+#     else:
+#         tmp0 = x0
+#         tmp1 = y0
+#     carry += tmp0 * np.conj(tmp1)  # nx x ny x w
+#     return carry, 0
+
+
+# def fold(carry, x0, alltoall):
+#     xn = x0.shape[0]
+#     if alltoall:
+#         tmp0 = broadcast(x0, sizes=(xn,))
+#         tmp1 = tmp0.transpose([1, 0, 2])
+#     else:
+#         tmp0 = x0
+#         tmp1 = x0
+#     carry += tmp0 * np.conj(tmp1)  # nx x ny x w
+#     return carry, 0

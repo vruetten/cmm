@@ -3,68 +3,10 @@ from cmm.utils import _triage_segments, make_chunks
 from numpy import fft as sp_fft
 from jax.lax import scan
 from jax.lax import broadcast
+from cmm.utils import build_fft_trial_projection_matrices
 
 
-def estimate_spectrum_from_coefs(
-    coefs_xknf: np.array, coefs_yknf=None, alltoall=True, abs=True
-):
-    xn = coefs_xknf.shape[0]
-    kn = coefs_xknf.shape[1]
-    wn = coefs_xknf.shape[-1]
-
-    if coefs_yknf is not None:
-        yn = coefs_yknf.shape[0]
-        fxy = lambda v, y: foldxy(v, y, alltoall)
-        if alltoall:
-            init = np.zeros([xn, yn, wn]).astype("complex64")
-        else:
-            init = np.zeros([xn, wn]).astype("complex64")
-        pxy, _ = scan(fxy, init, (coefs_xknf, coefs_yknf))
-    else:
-        fxy = lambda v, y: fold(v, y, alltoall)
-        if alltoall:
-            init = np.zeros([xn, xn, wn]).astype("complex64")
-        else:
-            init = np.zeros([xn, wn]).astype("complex64")
-        pxy, _ = scan(fxy, init, coefs_xknf)
-
-    pxy /= kn  # average over k
-
-    if abs:
-        pxy = np.abs(pxy)
-
-    return pxy
-
-
-def foldxy(carry, x, alltoall):
-    x0 = x[0]
-    y0 = x[1]
-    xn = x0.shape[0]
-    yn = y0.shape[0]
-    if alltoall:
-        tmp0 = broadcast(x0, sizes=(yn,))
-        tmp1 = broadcast(y0, sizes=(xn,))
-        tmp0 = tmp0.transpose([1, 0, 2])
-    else:
-        tmp0 = x0
-        tmp1 = y0
-    carry += tmp0 * np.conj(tmp1)  # nx x ny x w
-    return carry, 0
-
-
-def fold(carry, x0, alltoall):
-    xn = x0.shape[0]
-    if alltoall:
-        tmp0 = broadcast(x0, sizes=(xn,))
-        tmp1 = tmp0.transpose([1, 0, 2])
-    else:
-        tmp0 = x0
-        tmp1 = x0
-    carry += tmp0 * np.conj(tmp1)  # nx x ny x w
-    return carry, 0
-
-
-def compute_spectral_coefs(
+def compute_spectral_coefs(  # used in coherence
     xnt: np.ndarray,
     fs=1.0,
     window="hann",
@@ -202,8 +144,9 @@ def compute_coherence(
     scaling="spectrum",
     axis=-1,
     freq_minmax=[0, np.inf],
-    abs=False,
     alltoall=True,  # every x with every y
+    y_in_coefs=False,
+    x_in_coefs=False,
 ):
     pxx_nk, freq = estimate_spectrum(
         xnt=xnt,
@@ -219,6 +162,7 @@ def compute_coherence(
         freq_minmax=freq_minmax,
         abs=True,
         alltoall=False,
+        x_in_coefs=x_in_coefs,
     )
     pyy_mk, freq = estimate_spectrum(
         xnt=ynt,
@@ -234,6 +178,7 @@ def compute_coherence(
         freq_minmax=freq_minmax,
         abs=True,
         alltoall=False,
+        x_in_coefs=y_in_coefs,
     )
     pxy_nmk, freq = estimate_spectrum(
         xnt=xnt,
@@ -250,6 +195,8 @@ def compute_coherence(
         freq_minmax=freq_minmax,
         abs=True,
         alltoall=True,
+        x_in_coefs=x_in_coefs,
+        y_in_coefs=y_in_coefs,
     )
     coherence = pxy_nmk**2 / (pxx_nk[:, None] * pyy_mk[None])
     return coherence, freq
@@ -265,7 +212,7 @@ def estimate_spectrum(
     nfft=None,
     detrend="constant",
     return_onesided=True,
-    scaling="spectrum",
+    scaling="spectrum",  # default scaling from scipy
     axis=-1,
     freq_minmax=[0, np.inf],
     abs=False,
@@ -397,7 +344,6 @@ def estimate_spectrum(
     kn = coefs_xknf.shape[0]
 
     if ynt is not None:
-        print(coefs_yknf.shape, coefs_xknf.shape)
         if alltoall:
             pxy = np.einsum("knf, kmf-> nmf", coefs_xknf, np.conj(coefs_yknf))
         else:
@@ -410,25 +356,55 @@ def estimate_spectrum(
         else:
             pxy = np.einsum("knf, knf-> nf", coefs_xknf, np.conj(coefs_xknf))
 
-    # if ynt is not None:
-    #     fxy = lambda v, y: foldxy(v, y, alltoall)
-    #     if alltoall:
-    #         init = np.zeros([xn, yn, wn]).astype("complex64")
-    #     else:
-    #         init = np.zeros([xn, wn]).astype("complex64")
-
-    #     pxy, _ = scan(fxy, init, (coefs_xknf, coefs_yknf))
-    # else:
-    #     fxy = lambda v, y: fold(v, y, alltoall)
-    #     if alltoall:
-    #         init = np.zeros([xn, xn, wn]).astype("complex64")
-    #     else:
-    #         init = np.zeros([xn, wn]).astype("complex64")
-    #     pxy, _ = scan(fxy, init, coefs_xknf)
-
-    # pxy /= kn  # average over k
-
     if abs:
         pxy = np.abs(pxy)
 
     return pxy, freqs
+
+
+# def compute_coefs_by_hand( # not used
+#     xnt: np.array,
+#     nperseg: int,
+#     noverlap: int,
+#     fs: float,
+#     freq_minmax,
+# ):
+#     n, t = xnt.shape
+#     valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+#         t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
+#     )
+#     xnkf_coefs = np.tensordot(xnt, valid_DFT_Wktf, axes=(1, 1))
+#     xnt_proj = np.einsum("ijm, jlm->il", xnkf_coefs, valid_iDFT_Wktf).real
+#     xntf_proj = np.einsum("ijm, jlm->ilm", xnkf_coefs, valid_iDFT_Wktf).real
+#     return xnkf_coefs, xnt_proj, xntf_proj
+
+
+# def estimate_spectrum_from_coefs(
+#     coefs_xknf: np.array, coefs_yknf=None, alltoall=True, abs=True
+# ):
+#     xn = coefs_xknf.shape[0]
+#     kn = coefs_xknf.shape[1]
+#     wn = coefs_xknf.shape[-1]
+
+#     if coefs_yknf is not None:
+#         yn = coefs_yknf.shape[0]
+#         fxy = lambda v, y: foldxy(v, y, alltoall)
+#         if alltoall:
+#             init = np.zeros([xn, yn, wn]).astype("complex64")
+#         else:
+#             init = np.zeros([xn, wn]).astype("complex64")
+#         pxy, _ = scan(fxy, init, (coefs_xknf, coefs_yknf))
+#     else:
+#         fxy = lambda v, y: fold(v, y, alltoall)
+#         if alltoall:
+#             init = np.zeros([xn, xn, wn]).astype("complex64")
+#         else:
+#             init = np.zeros([xn, wn]).astype("complex64")
+#         pxy, _ = scan(fxy, init, coefs_xknf)
+
+#     pxy /= kn  # average over k
+
+#     if abs:
+#         pxy = np.abs(pxy)
+
+#     return pxy
