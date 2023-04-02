@@ -397,20 +397,34 @@ def estimate_spectrum(
     kn = coefs_xknf.shape[0]
 
     if ynt is not None:
-        fxy = lambda v, y: foldxy(v, y, alltoall)
+        print(coefs_yknf.shape, coefs_xknf.shape)
         if alltoall:
-            init = np.zeros([xn, yn, wn]).astype("complex64")
+            pxy = np.einsum("knf, kmf-> nmf", coefs_xknf, np.conj(coefs_yknf))
         else:
-            init = np.zeros([xn, wn]).astype("complex64")
+            pxy = np.einsum("knf, knf-> nf", coefs_xknf, np.conj(coefs_yknf))
 
-        pxy, _ = scan(fxy, init, (coefs_xknf, coefs_yknf))
     else:
-        fxy = lambda v, y: fold(v, y, alltoall)
+
         if alltoall:
-            init = np.zeros([xn, xn, wn]).astype("complex64")
+            pxy = np.einsum("knf, kmf-> nmf", coefs_xknf, np.conj(coefs_xknf))
         else:
-            init = np.zeros([xn, wn]).astype("complex64")
-        pxy, _ = scan(fxy, init, coefs_xknf)
+            pxy = np.einsum("knf, knf-> nf", coefs_xknf, np.conj(coefs_xknf))
+
+    # if ynt is not None:
+    #     fxy = lambda v, y: foldxy(v, y, alltoall)
+    #     if alltoall:
+    #         init = np.zeros([xn, yn, wn]).astype("complex64")
+    #     else:
+    #         init = np.zeros([xn, wn]).astype("complex64")
+
+    #     pxy, _ = scan(fxy, init, (coefs_xknf, coefs_yknf))
+    # else:
+    #     fxy = lambda v, y: fold(v, y, alltoall)
+    #     if alltoall:
+    #         init = np.zeros([xn, xn, wn]).astype("complex64")
+    #     else:
+    #         init = np.zeros([xn, wn]).astype("complex64")
+    #     pxy, _ = scan(fxy, init, coefs_xknf)
 
     # pxy /= kn  # average over k
 

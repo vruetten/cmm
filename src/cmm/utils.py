@@ -1,5 +1,68 @@
 import numpy as np
 from numpy import fft as sp_fft
+from typing import Tuple
+
+
+def build_fft_trial_projection_matrices(
+    t: int, nperseg: int, noverlap: int, fs=1, freq_minmax=[-np.inf, np.inf]
+):
+    Wkt = make_window_matrix(t, nperseg=nperseg, noverlap=noverlap)
+    DFT, freqs = get_fftmat(t, fs=fs)
+
+    valid_freq_inds = (np.abs(freqs) >= freq_minmax[0]) & (
+        np.abs(freqs) <= freq_minmax[1]
+    )
+    valid_freqs = freqs[valid_freq_inds]
+    f = len(valid_freqs)
+    valid_DFT = DFT[:, valid_freq_inds]
+
+    valid_DFT_Wktf = valid_DFT[None] * Wkt[:, :, None]
+    valid_iDFT_Wktf = 1 / valid_DFT[None] / f * Wkt[:, :, None]
+
+    return valid_DFT_Wktf, valid_iDFT_Wktf
+
+
+def foldxy(carry, x):
+    import jax.numpy as jnp
+    from jax.lax import broadcast
+
+    x0 = x[0]
+    y0 = x[1]
+    xn = x0.shape[0]
+    yn = y0.shape[0]
+    tmp0 = broadcast(x0, sizes=(yn,))
+    tmp1 = broadcast(y0, sizes=(xn,))
+    tmp0 = tmp0.transpose([1, 0, 2])
+    carry += tmp0 * jnp.conj(tmp1)  # k x k' x w
+    return carry, 0
+
+
+def make_window_matrix(
+    t: int, nperseg: int, noverlap: int, win_type="hann"
+) -> np.array:
+    """return windowing matrix
+    Parameters
+    -----
+    win_type : str
+    t : int
+        Length of timeseries
+    """
+    from scipy.signal.windows import get_window
+
+    win = get_window(win_type, nperseg)  # return a 1d array
+    step = nperseg - noverlap
+    k = (t - noverlap) // step
+    mat = np.zeros(shape=(k, t))
+    mat[0, :nperseg] = win
+    for i in range(1, k):
+        mat[i] = np.roll(mat[0:1], step * i, axis=1)
+    return mat
+
+
+def get_fftmat(t: int, fs: 1) -> Tuple[np.array, np.array]:
+    dftmtx = np.fft.fft(np.eye(t))
+    freqs = np.fft.fftfreq(t, d=1 / fs)
+    return dftmtx, freqs
 
 
 def make_chunks(x: np.ndarray, nperseg: int, noverlap: int):

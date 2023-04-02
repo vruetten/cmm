@@ -6,6 +6,28 @@ from cmm import utils
 import jax.numpy as jnp
 from jax.lax import scan
 from cmm.utils import foldxy
+from scipy.linalg import eigh
+from cmm.utils import build_fft_trial_projection_matrices
+
+
+def compute_coefs(
+    xnt: np.array,
+    nperseg: int,
+    noverlap: int,
+    fs: float,
+    freq_minmax,
+):
+
+    n, t = xnt.shape
+
+    print(f"n, t: {n, t}")
+    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+        t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
+    )
+    xnkf_coefs = np.tensordot(xnt, valid_DFT_Wktf, axes=(1, 1))
+    xnt_proj = jnp.einsum("ijm, jlm->il", xnkf_coefs, valid_iDFT_Wktf).real
+    xntf_proj = jnp.einsum("ijm, jlm->ilm", xnkf_coefs, valid_iDFT_Wktf).real
+    return xnkf_coefs, xnt_proj, xntf_proj
 
 
 def compute_clusters(
@@ -13,36 +35,51 @@ def compute_clusters(
     nperseg: int,
     noverlap: int,
     fs: float,
-    freq_minmax,
+    freq_minmax=[-np.inf, np.inf],
 ):
     n, t = xnt.shape
-    Wkt = utils.make_window_matrix(t, nperseg=nperseg, noverlap=noverlap)
-    DFT, freqs = utils.get_fftmat(t, fs=fs)
 
-    valid_freq_inds = (np.abs(freqs) >= freq_minmax[0]) & (
-        np.abs(freqs) <= freq_minmax[1]
+    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+        t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
     )
-    valid_freqs = freqs[valid_freq_inds]
-    f = len(valid_freqs)
-    valid_DFT = DFT[:, valid_freq_inds]
-    valid_DFT_Wktf = valid_DFT[None] * Wkt[:, :, None]
+
     xnkf_coefs = np.tensordot(xnt, valid_DFT_Wktf, axes=(1, 1))
     k = xnkf_coefs.shape[1]
-    init = np.zeros([k, k, f]).astype("complex64")
-    fxy = lambda v, y: foldxy(v, y)
-    xnkf_coefs = jnp.array(xnkf_coefs)
-    pkkf, _ = scan(fxy, init, (xnkf_coefs, xnkf_coefs))  # average over n
-    pkkf /= n
 
-    DW_pkkf_tkf = np.einsum("ijk,ilk->jlk", valid_DFT_Wktf, pkkf)
-    DW_pkkf_WD_ttf = np.einsum("ijk,jlk->ilk", DW_pkkf_tkf, np.conj(valid_DFT_Wktf))
-    DW_pkkf_WD_ftt = np.real(DW_pkkf_WD_ttf.transpose([2, 0, 1]))
-    V = [np.linalg.eigh(m) for m in DW_pkkf_WD_ftt]
-    eigvals = np.array(list(zip(*V))[0])[:, ::-1]
-    eigvecs = np.array(list(zip(*V))[1])[:, :, ::-1]
+    pn_f = np.sqrt(jnp.einsum("ijk, ijk->ik", xnkf_coefs, np.conj(xnkf_coefs)) / k)
+    xnkf_coefs_normalized = xnkf_coefs / pn_f[:, None]
+    pkkf = (
+        jnp.einsum(
+            "ijk, ilk->jlk", xnkf_coefs_normalized, np.conj(xnkf_coefs_normalized)
+        )
+        / n
+    )
+    Vp = [eigh(m, subset_by_index=[k - 1, k - 1]) for m in pkkf.transpose([2, 0, 1])]
+    eigvals_p = np.array(list(zip(*Vp))[0])
+    eigvecs_p_fk = np.array(list(zip(*Vp))[1]).squeeze()
+    eigvec_backproj_ft = jnp.einsum("ktf, fk->ft", valid_iDFT_Wktf, eigvecs_p_fk).real
 
-    return pkkf, DW_pkkf_WD_ftt, valid_DFT_Wktf, DW_pkkf_WD_ftt, eigvals, eigvecs
-    # return V
+    r = {}
+    r["eigvals_p"] = eigvals_p
+    r["eigvecs_p_fk"] = eigvecs_p_fk
+    r["eigvec_backproj_ft"] = eigvec_backproj_ft
+    r["pkkf"] = pkkf
+    r["DWktf"] = valid_DFT_Wktf
+    r["iDWktf"] = valid_iDFT_Wktf
+
+    return r
+
+    # print("pre einsum calculations")
+
+    # DW_pkkf_tkf = jnp.einsum("ktf,klf->tlf", valid_DFT_Wktf, pkkf)
+    # DW_pkkf_WD_ttf = jnp.einsum("tkf,klf->tlf", DW_pkkf_tkf, np.conj(valid_DFT_Wktf))
+    # DW_pkkf_WD_ftt = np.real(DW_pkkf_WD_ttf.transpose([2, 0, 1]))
+    # tt = DW_pkkf_WD_ftt.shape[-1]
+    # print("finished einsum calculations")
+
+    # V = [eigh(m, subset_by_index=[tt - 1, tt - 1]) for m in DW_pkkf_WD_ftt]
+    # eigvals = np.array(list(zip(*V))[0])
+    # eigvecs_ft = np.array(list(zip(*V))[1]).squeeze().real
 
 
 class CMM:
