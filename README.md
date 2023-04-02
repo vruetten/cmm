@@ -13,7 +13,7 @@ Unsupervised clustering algoirthm which clusters timeseries based on coherence.
 
 Coherence between two signals is defined as:
 ```math
- \mathcal{C}(\bm{\hat{x}}(\omega), \bm{\hat{\mu}}(\omega)) = \frac{|S_{x,\mu}(\omega)|^2}{S_{xx}(\omega)\cdot S_{\mu, \mu}(\omega)} =  \frac{|\sum_{k = 1}^K \hat{x}_k(\omega)\cdot \overline{\hat{\mu}_k}(\omega)|^2}{\left(\sum_{k = 1}^K \hat{\mu}_k(\omega)\cdot \overline{\hat{\mu}_k}(\omega)\right)\left(\sum_{k = 1}^K \hat{x}_k(\omega)\cdot \overline{\hat{x}_k(\omega)}\right)}
+ \mathcal{C}(\mathbf{\hat{x}}(\omega), \mathbf{\hat{\mu}}(\omega)) = \frac{|S_{x,\mu}(\omega)|^2}{S_{xx}(\omega)\cdot S_{\mu, \mu}(\omega)} =  \frac{|\sum_{k = 1}^K \hat{x}_k(\omega)\cdot \overline{\hat{\mu}_k}(\omega)|^2}{\left(\sum_{k = 1}^K \hat{\mu}_k(\omega)\cdot \overline{\hat{\mu}_k}(\omega)\right)\left(\sum_{k = 1}^K \hat{x}_k(\omega)\cdot \overline{\hat{x}_k(\omega)}\right)}
  ```
 
 
