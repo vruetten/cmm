@@ -19,16 +19,19 @@ class CMM:
         k: int,
         fs: float,
         nperseg: int,
-        noverlap: int,
-        freq_minmax: List,
-        opt_in_freqdom: bool,
+        noverlap=None,
+        freq_minmax=[-np.inf, np.inf],
+        opt_in_freqdom=True,
     ):
         self.xnt = xnt
         self.n, self.t = xnt.shape
         self.k = k
         self.fs = fs
         self.nperseg = nperseg
-        self.noverlap = noverlap
+        if noverlap is None:
+            self.noverlap = int(0.6 * nperseg)
+        else:
+            self.noverlap = noverlap
         self.freq_minmax = freq_minmax
         self.opt_in_freqdom = opt_in_freqdom
         self.initialize()
