@@ -14,6 +14,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="MIT",
-    packages=["cmm"],
+    packages=["src"],
     install_requires=["numpy", "jax", "tqdm"],
 )
