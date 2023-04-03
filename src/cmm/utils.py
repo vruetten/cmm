@@ -11,10 +11,7 @@ def build_DFT_matrix(t, f, real=True):
             ff = np.arange((f + 1) // 2)
         DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
     else:
-        if np.mod(f, 2) == 0:
-            ff = np.arange(f)
-        else:
-            ff = np.arange(f)
+        ff = np.arange(f)
         DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
     return DFT_tf
 
@@ -36,6 +33,40 @@ def build_fft_trial_projection_matrices(
     valid_iDFT_Wktf = 1 / valid_DFT[None] / t * Wkt[:, :, None]
 
     return valid_DFT_Wktf, valid_iDFT_Wktf
+
+
+def build_fft_trial_projection_matrices2(
+    t: int,
+    nperseg: int,
+    noverlap: int,
+    fs=1,
+    freq_minmax=[-np.inf, np.inf],
+    win_type="hann",
+):
+    from scipy.signal.windows import get_window
+
+    win = get_window(win_type, nperseg)  # return a 1d array
+    step = nperseg - noverlap
+    k = (t - noverlap) // step
+
+    win_kt = np.repeat(win[None], axis=0, repeats=k)
+    scale = 1.0 / win.sum() ** 2
+
+    DFT_ff = build_DFT_matrix(nperseg, nperseg, real=True) * scale
+    wd_tf = win[:, None] * DFT_ff
+    iwd_tf = win[:, None] * 1 / DFT_ff
+
+    f = DFT_ff.shape[1]
+    Wktf = np.zeros(shape=(k, t, f)) * 1j
+    iWktf = np.zeros(shape=(k, t, f)) * 1j
+    Wktf[0, :nperseg] = wd_tf
+    iWktf[0, :nperseg] = iwd_tf
+
+    for i in range(1, k):
+        Wktf[i, i * step : i * step + nperseg] = wd_tf
+        iWktf[i, i * step : i * step + nperseg] = iwd_tf
+
+    return Wktf, iWktf / t
 
 
 def foldxy(carry, x):

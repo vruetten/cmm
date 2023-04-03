@@ -1,5 +1,5 @@
 import jax.numpy as np
-from cmm.utils import build_fft_trial_projection_matrices
+from cmm.utils import build_fft_trial_projection_matrices2
 from scipy.linalg import eigh
 
 
@@ -11,7 +11,7 @@ def compute_spectral_coefs_by_hand(
     freq_minmax=[-np.inf, np.inf],
 ):
     n, t = xnt.shape
-    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices2(
         t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
     )
 
@@ -32,7 +32,7 @@ def compute_cluster_mean(
     if not x_in_coefs:
         n, t = xnt.shape
 
-        valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+        valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices2(
             t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
         )
         # this does not detrendreturn_onesided=False,

@@ -220,6 +220,7 @@ def estimate_spectrum(
     return_coefs=False,
     y_in_coefs=False,
     x_in_coefs=False,
+    normalize_per_trial=False,
 ):
     """Calculate various forms of windowed FFTs for PSD, CSD, etc.
 
@@ -358,6 +359,8 @@ def estimate_spectrum(
 
     if abs:
         pxy = np.abs(pxy)
+    if normalize_per_trial:
+        pxy /= kn
 
     return pxy, freqs
 
