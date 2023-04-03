@@ -8,7 +8,7 @@ from jax.lax import scan
 from cmm.utils import foldxy
 from scipy.linalg import eigh
 from cmm.utils import build_fft_trial_projection_matrices
-from cmm.cmm_funcs import compute_cluster_mean
+from cmm.cmm_funcs import compute_cluster_mean, compute_spectral_coefs_by_hand
 from cmm.spectral_funcs import compute_coherence
 
 
@@ -43,10 +43,23 @@ class CMM:
         if self.opt_in_freqdom:
             self.initialize_coefs()
 
+    def backproj_means(
+        self,
+    ):
+        self.ymtf = np.einsum("mkf,ktf->mtf", self.coefs_ymkf, self.valid_iDFT_Wktf)
+
     def initialize_coefs(
         self,
     ):
-        self.coefs_xknf, self.freqs = sf.compute_spectral_coefs(
+        # self.coefs_xknf, self.freqs = sf.compute_spectral_coefs(
+        #     xnt=self.xnt,
+        #     fs=self.fs,
+        #     nperseg=self.nperseg,
+        #     noverlap=self.noverlap,
+        #     freq_minmax=self.freq_minmax,
+        #     return_onesided=False,
+        # )
+        self.coefs_xnkf = compute_spectral_coefs_by_hand(
             xnt=self.xnt,
             fs=self.fs,
             nperseg=self.nperseg,
@@ -54,7 +67,7 @@ class CMM:
             freq_minmax=self.freq_minmax,
         )
         self.valid_DFT_Wktf, self.valid_iDFT_Wktf = build_fft_trial_projection_matrices(
-            self.t,
+            self.nperseg,
             nperseg=self.nperseg,
             noverlap=self.noverlap,
             fs=self.fs,
@@ -73,13 +86,23 @@ class CMM:
         self.labels = self.labels_init
         self.means_mt = self.kmeans_init_mt
         if self.opt_in_freqdom:
-            self.coefs_ykmf, self.freqs = sf.compute_spectral_coefs(
-                xnt=self.means_mt,
-                fs=self.fs,
-                nperseg=self.nperseg,
-                noverlap=self.noverlap,
-                freq_minmax=self.freq_minmax,
+            self.coefs_ymkf = np.array(
+                compute_spectral_coefs_by_hand(
+                    xnt=self.means_mt,
+                    fs=self.fs,
+                    nperseg=self.nperseg,
+                    noverlap=self.noverlap,
+                    freq_minmax=self.freq_minmax,
+                )
             )
+            # self.coefs_ykmf, self.freqs = sf.compute_spectral_coefs(
+            #     xnt=self.means_mt,
+            #     fs=self.fs,
+            #     nperseg=self.nperseg,
+            #     noverlap=self.noverlap,
+            #     freq_minmax=self.freq_minmax,
+            #     return_onesided=False,
+            # )
 
     def get_cluster_means(
         self,
@@ -87,14 +110,24 @@ class CMM:
         for i in range(self.k):
             if self.opt_in_freqdom:
                 valid_inds = self.labels == i
-                subdata_nkf = self.coefs_xknf.transpose(1, 0, 2)[valid_inds]
+                # subdata_nkf = self.coefs_xknf.transpose(1, 0, 2)[valid_inds]
+                subdata_nkf = self.coefs_xnkf[valid_inds]
                 if sum(valid_inds) == 1:
                     subdata_nkf = subdata_nkf[:]
                 if sum(valid_inds) == 0:
                     print("no data point allocated")
                     break
 
-                self.coefs_ykmf[:, i] = compute_cluster_mean(
+                # self.coefs_ykmf[:, i] = compute_cluster_mean(
+                #     subdata_nkf,
+                #     nperseg=self.nperseg,
+                #     noverlap=self.noverlap,
+                #     fs=self.fs,
+                #     freq_minmax=self.freq_minmax,
+                #     x_in_coefs=True,
+                #     return_temporal_proj=False,
+                # ).T
+                self.coefs_ymkf[i] = compute_cluster_mean(
                     subdata_nkf,
                     nperseg=self.nperseg,
                     noverlap=self.noverlap,
@@ -121,8 +154,8 @@ class CMM:
     ):
         if self.opt_in_freqdom:
             coherence_mnk, _ = compute_coherence(
-                self.coefs_ykmf,
-                self.coefs_xknf,
+                self.coefs_ymkf.transpose([1, 0, 2]),
+                self.coefs_xnkf.transpose([1, 0, 2]),
                 fs=self.fs,
                 nperseg=self.nperseg,
                 noverlap=self.noverlap,

@@ -6,7 +6,7 @@ from jax.lax import broadcast
 from cmm.utils import build_fft_trial_projection_matrices
 
 
-def compute_spectral_coefs(  # used in coherence
+def compute_spectral_coefs(  # used in coherence/cmm if coefs chosen
     xnt: np.ndarray,
     fs=1.0,
     window="hann",

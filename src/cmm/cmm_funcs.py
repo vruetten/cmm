@@ -3,6 +3,23 @@ from cmm.utils import build_fft_trial_projection_matrices
 from scipy.linalg import eigh
 
 
+def compute_spectral_coefs_by_hand(
+    xnt: np.array,
+    nperseg: int,
+    noverlap: int,
+    fs: float,
+    freq_minmax=[-np.inf, np.inf],
+):
+    n, t = xnt.shape
+    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+        t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
+    )
+
+    xnkf_coefs = np.tensordot(xnt, valid_DFT_Wktf, axes=(1, 1))
+
+    return xnkf_coefs
+
+
 def compute_cluster_mean(
     xnt: np.array,
     nperseg: int,
@@ -18,7 +35,7 @@ def compute_cluster_mean(
         valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
             t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
         )
-
+        # this does not detrendreturn_onesided=False,
         xnkf_coefs = np.tensordot(xnt, valid_DFT_Wktf, axes=(1, 1))
 
     else:

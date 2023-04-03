@@ -20,7 +20,7 @@ fs = 20
 nperseg = 80
 noverlap = int(0.8 * nperseg)
 subn = 5
-m = 4
+m = 3
 freq_minmax = [0, 3]
 freq_minmax = [-np.inf, np.inf]
 noise = 1e-3
@@ -42,9 +42,9 @@ cm = cmm.CMM(
     opt_in_freqdom=opt_in_freqdom,
 )
 
-itemax = 20
+itemax = 2
 cm.optimize(itemax=itemax)
-cm.back_proj_means()
+cm.backproj_means()
 
 print(f"random: {cm.labels_init}")
 print(f"kmeans: {cm.kmeans.labels_}")

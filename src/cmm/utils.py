@@ -3,21 +3,37 @@ from numpy import fft as sp_fft
 from typing import Tuple
 
 
+def build_DFT_matrix(t, f, real=True):
+    if real:
+        if np.mod(f, 2) == 0:
+            ff = np.arange((f + 2) // 2)
+        else:
+            ff = np.arange((f + 1) // 2)
+        DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
+    else:
+        if np.mod(f, 2) == 0:
+            ff = np.arange(f)
+        else:
+            ff = np.arange(f)
+        DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
+    return DFT_tf
+
+
 def build_fft_trial_projection_matrices(
     t: int, nperseg: int, noverlap: int, fs=1, freq_minmax=[-np.inf, np.inf]
 ):
     Wkt = make_window_matrix(t, nperseg=nperseg, noverlap=noverlap)
-    DFT, freqs = get_fftmat(t, fs=fs)
+    DFT_tf = build_DFT_matrix(t, nperseg, real=True)
+    freqs = np.fft.rfftfreq(nperseg, d=1 / fs)
 
     valid_freq_inds = (np.abs(freqs) >= freq_minmax[0]) & (
         np.abs(freqs) <= freq_minmax[1]
     )
     valid_freqs = freqs[valid_freq_inds]
-    f = len(valid_freqs)
-    valid_DFT = DFT[:, valid_freq_inds]
+    valid_DFT = DFT_tf[:, valid_freq_inds]
 
     valid_DFT_Wktf = valid_DFT[None] * Wkt[:, :, None]
-    valid_iDFT_Wktf = 1 / valid_DFT[None] / f * Wkt[:, :, None]
+    valid_iDFT_Wktf = 1 / valid_DFT[None] / t * Wkt[:, :, None]
 
     return valid_DFT_Wktf, valid_iDFT_Wktf
 
