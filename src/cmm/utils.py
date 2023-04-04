@@ -54,7 +54,7 @@ def build_fft_trial_projection_matrices2(
 
     DFT_ff = build_DFT_matrix(nperseg, nperseg, real=True) * scale
     wd_tf = win[:, None] * DFT_ff
-    iwd_tf = win[:, None] * 1 / DFT_ff
+    iwd_tf = win[:, None] * 1 / DFT_ff / nperseg
 
     f = DFT_ff.shape[1]
     Wktf = np.zeros(shape=(k, t, f)) * 1j
@@ -66,7 +66,7 @@ def build_fft_trial_projection_matrices2(
         Wktf[i, i * step : i * step + nperseg] = wd_tf
         iWktf[i, i * step : i * step + nperseg] = iwd_tf
 
-    return Wktf, iWktf / t
+    return Wktf, iWktf
 
 
 def foldxy(carry, x):

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax.lax import scan
 from cmm.utils import foldxy
 from scipy.linalg import eigh
-from cmm.utils import build_fft_trial_projection_matrices
+from cmm.utils import build_fft_trial_projection_matrices2
 from cmm.cmm_funcs import compute_cluster_mean, compute_spectral_coefs_by_hand
 from cmm.spectral_funcs import compute_coherence
 
@@ -65,7 +65,10 @@ class CMM:
         self,
     ):
         self.coefs_xnkf = self.project_to_coefs(self.xnt)
-        self.valid_DFT_Wktf, self.valid_iDFT_Wktf = build_fft_trial_projection_matrices(
+        (
+            self.valid_DFT_Wktf,
+            self.valid_iDFT_Wktf,
+        ) = build_fft_trial_projection_matrices2(
             self.t,
             nperseg=self.nperseg,
             noverlap=self.noverlap,
