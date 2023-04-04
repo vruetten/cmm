@@ -55,12 +55,12 @@ def compute_cluster_mean(
     )
 
     Vp = [eigh(m, subset_by_index=[k - 1, k - 1]) for m in pkkf.transpose([2, 0, 1])]
-    eigvals_p = np.array(list(zip(*Vp))[0])
+    eigvals_p = np.array(list(zip(*Vp))[0]).squeeze()
     eigvecs_p_fk = np.array(list(zip(*Vp))[1]).squeeze()
     if return_temporal_proj:
         eigvec_backproj_ft = np.einsum(
             "ktf, fk->ft", valid_iDFT_Wktf, eigvecs_p_fk
         ).real
-        return eigvec_backproj_ft
+        return eigvec_backproj_ft, eigvals_p
     else:
-        return eigvecs_p_fk
+        return eigvecs_p_fk, eigvals_p

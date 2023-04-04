@@ -89,6 +89,8 @@ class CMM:
         self.means_mt = self.kmeans_init_mt
         if self.opt_in_freqdom:
             self.coefs_ymkf = np.array(self.project_to_coefs(self.means_mt))
+            self.f = self.coefs_ymkf.shape[-1]
+            self.eigvals_kf = np.zeros([self.k, self.f])
 
     def get_cluster_means(
         self,
@@ -102,7 +104,7 @@ class CMM:
                 if sum(valid_inds) == 0:
                     print("no data point allocated")
                     break
-                self.coefs_ymkf[i] = compute_cluster_mean(
+                eigvecs_fk, eigvals_f = compute_cluster_mean(
                     subdata_nkf,
                     nperseg=self.nperseg,
                     noverlap=self.noverlap,
@@ -110,11 +112,14 @@ class CMM:
                     freq_minmax=self.freq_minmax,
                     x_in_coefs=True,
                     return_temporal_proj=False,
-                ).T
+                )
+
+                self.coefs_ymkf[i] = eigvecs_fk.T
+                self.eigvals_kf[i] = eigvals_f
 
             else:
                 subdata_nt = self.xnt[self.labels == i]
-                self.means_mt[i] = compute_cluster_mean(
+                eigvec_backproj_ft, eigvals_f = compute_cluster_mean(
                     subdata_nt,
                     nperseg=self.nperseg,
                     noverlap=self.noverlap,
@@ -122,21 +127,30 @@ class CMM:
                     freq_minmax=self.freq_minmax,
                     x_in_coefs=False,
                     return_temporal_proj=True,
-                ).mean(0)
+                )
+
+                self.means_mt[i] = eigvecs_fk.mean(0)
+
+    def compute_cross_coherence_from_coefs(self, coefs_ymkf, coefs_xnkf):
+        coherence_mnk, _ = compute_coherence(
+            coefs_ymkf.transpose([1, 0, 2]),
+            coefs_xnkf.transpose([1, 0, 2]),
+            fs=self.fs,
+            nperseg=self.nperseg,
+            noverlap=self.noverlap,
+            freq_minmax=self.freq_minmax,
+            x_in_coefs=True,
+            y_in_coefs=True,
+        )
+
+        return coherence_mnk
 
     def allocate_data_to_clusters(
         self,
     ):
         if self.opt_in_freqdom:
-            coherence_mnk, _ = compute_coherence(
-                self.coefs_ymkf.transpose([1, 0, 2]),
-                self.coefs_xnkf.transpose([1, 0, 2]),
-                fs=self.fs,
-                nperseg=self.nperseg,
-                noverlap=self.noverlap,
-                freq_minmax=self.freq_minmax,
-                x_in_coefs=True,
-                y_in_coefs=True,
+            coherence_mnk = self.compute_cross_coherence_from_coefs(
+                self.coefs_ymkf, self.coefs_xnkf
             )
 
         else:
@@ -151,7 +165,6 @@ class CMM:
                 y_in_coefs=False,
             )
         self.coherence_mn = coherence_mnk.mean(-1)
-        # print(self.coherence_mn)
         self.labels = np.argmax(self.coherence_mn, axis=0)
 
     def optimize(self, itemax: int):

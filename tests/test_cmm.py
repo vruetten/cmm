@@ -19,8 +19,8 @@ t_ = 800
 fs = 20
 nperseg = 80
 noverlap = int(0.8 * nperseg)
-subn = 5
-m = 3
+subn = 3
+m = 2
 freq_minmax = [0, 3]
 freq_minmax = [-np.inf, np.inf]
 noise = 1e-4
@@ -46,10 +46,14 @@ cm = cmm.CMM(
     opt_in_freqdom=opt_in_freqdom,
 )
 
-itemax = 2
+itemax = 20
 cm.optimize(itemax=itemax)
 if opt_in_freqdom:
     cm.backproj_means()
+    coherence_mnk = cm.compute_cross_coherence_from_coefs(cm.coefs_ymkf, cm.coefs_xnkf)
+
+tmp = np.vstack([coherence_mnk[0].sum(0), cm.eigvals_kf[0]])
+print(tmp[:, :4])
 
 print(f"random: {cm.labels_init}")
 print(f"kmeans: {cm.kmeans.labels_}")
@@ -68,11 +72,11 @@ pl.title(f"reconstruction nperseg: {nperseg}", fontsize=20, y=title_offset)
 pl.savefig(path + f"cmm reconstruction nperseg {nperseg}", bbox_inches="tight")
 
 
-fmax = 20
+fmax = 15
 pl.figure()
 fig, axs = pl.subplots(nrows=m, ncols=2, figsize=(21, 4 * m), sharex=True)
 for ind in range(m):
-    axs[ind, 0].plot(xax, cm.ymtf[ind, :, :].sum(-1), lw=4, alpha=0.8)
+    axs[ind, 0].plot(xax, cm.ymtf[ind, :, :fmax].sum(-1), lw=4, alpha=0.8)
     axs[ind, 1].plot(xax, xnt[(ind * subn) : (ind + 1) * subn].T)
     axs[ind, 0].set_title(f"cluster mean {ind}")
     axs[ind, 1].set_title(f"observations {ind}")
@@ -80,14 +84,14 @@ axs[-1, 0].set_xlabel("time")
 axs[-1, 1].set_xlabel("time")
 pl.savefig(path + f"results nperseg {nperseg}", bbox_inches="tight")
 
-
-sl = slice(nperseg, nperseg * 2)
+fmax = 10
+sl = slice(nperseg * 2, nperseg * 3)
 pl.figure()
 fig, axs = pl.subplots(nrows=m, ncols=2, figsize=(21, 4 * m), sharex=True)
 for ind in range(m):
     axs[ind, 0].plot(
         xax[sl],
-        cm.ymtf[ind, :, :20].sum(-1)[sl],
+        cm.ymtf[ind, :, :fmax].sum(-1)[sl],
         lw=4,
         alpha=0.8,
     )
