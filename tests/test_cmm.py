@@ -19,8 +19,8 @@ t_ = 800
 fs = 20
 nperseg = 80
 noverlap = int(0.8 * nperseg)
-subn = 3
-m = 2
+subn = 4
+m = 3
 freq_minmax = [0, 3]
 freq_minmax = [-np.inf, np.inf]
 noise = 1e-4
@@ -101,3 +101,29 @@ for ind in range(m):
 axs[-1, 0].set_xlabel("time")
 axs[-1, 1].set_xlabel("time")
 pl.savefig(path + f"results zoom nperseg {nperseg}", bbox_inches="tight")
+
+
+### plot actually learnt clusters
+
+
+fmax = slice(3, 4)
+sl = slice(nperseg * 2, nperseg * 4)
+pl.figure()
+fig, axs = pl.subplots(nrows=k, ncols=1, figsize=(21, 4 * k), sharex=True)
+for ind in range(k):
+    axs[ind].set_title(f"cluster {ind}")
+    subdata_ntf = xntf_proj[cm.labels == ind]
+    axs[ind].plot(
+        xax[sl],
+        cm.ymtf[ind, sl, fmax].sum(-1),
+        lw=5,
+        alpha=0.8,
+        label="cluster mean",
+        ls="--",
+    )
+    axs[ind].plot(xax[sl], subdata_ntf[:, sl, fmax].sum(-1).T)
+    axs[ind].legend()
+axs[-1].set_xlabel("time")
+# axs[-1, 1].set_xlabel("time")
+
+pl.savefig(path + f"results backproj zoom nperseg {nperseg} ", bbox_inches="tight")

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax.lax import scan
 from cmm.utils import foldxy
 from scipy.linalg import eigh
-from cmm.utils import build_fft_trial_projection_matrices2
+from cmm.utils import build_fft_trial_projection_matrices
 from cmm.cmm_funcs import compute_cluster_mean, compute_spectral_coefs_by_hand
 from cmm.spectral_funcs import compute_coherence
 
@@ -48,6 +48,16 @@ class CMM:
     ):
         self.ymtf = self.backproject(self.coefs_ymkf)
 
+    def analyse_results(
+        self,
+    ):
+        # back project data
+        self.xntf = self.backproject(self.coefs_xnkf)
+        self.ymtf = self.backproject(self.coefs_ymkf)
+        self.coherence_mnf = self.compute_cross_coherence_from_coefs(
+            self.coefs_ymkf, self.coefs_xnkf
+        )
+
     def backproject(self, coefs_znkf):
         return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
 
@@ -65,10 +75,11 @@ class CMM:
         self,
     ):
         self.coefs_xnkf = self.project_to_coefs(self.xnt)
+
         (
             self.valid_DFT_Wktf,
             self.valid_iDFT_Wktf,
-        ) = build_fft_trial_projection_matrices2(
+        ) = build_fft_trial_projection_matrices(
             self.t,
             nperseg=self.nperseg,
             noverlap=self.noverlap,
@@ -133,14 +144,15 @@ class CMM:
 
     def compute_cross_coherence_from_coefs(self, coefs_ymkf, coefs_xnkf):
         coherence_mnk, _ = compute_coherence(
-            coefs_ymkf.transpose([1, 0, 2]),
-            coefs_xnkf.transpose([1, 0, 2]),
+            coefs_ymkf,
+            coefs_xnkf,
             fs=self.fs,
             nperseg=self.nperseg,
             noverlap=self.noverlap,
             freq_minmax=self.freq_minmax,
             x_in_coefs=True,
             y_in_coefs=True,
+            detrend=False,
         )
 
         return coherence_mnk
@@ -163,6 +175,7 @@ class CMM:
                 freq_minmax=self.freq_minmax,
                 x_in_coefs=False,
                 y_in_coefs=False,
+                detrend=False,
             )
         self.coherence_mn = coherence_mnk.mean(-1)
         self.labels = np.argmax(self.coherence_mn, axis=0)
