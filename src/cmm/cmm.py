@@ -34,6 +34,7 @@ class CMM:
             self.noverlap = noverlap
         self.freq_minmax = freq_minmax
         self.opt_in_freqdom = opt_in_freqdom
+        self.detrend = False
         self.initialize()
 
     def initialize(
@@ -57,6 +58,21 @@ class CMM:
         self.coherence_mnf = self.compute_cross_coherence_from_coefs(
             self.coefs_ymkf, self.coefs_xnkf
         )
+
+    def estimate_spectrum(
+        self,
+        coefs_xnkf,
+    ):
+        pxnf, freqs = sf.estimate_spectrum(
+            coefs_xnkf,
+            fs=self.fs,
+            nperseg=self.nperseg,
+            noverlap=self.noverlap,
+            x_in_coefs=True,
+            alltoall=False,
+            detrend=self.detrend,
+        )
+        return pxnf.real, freqs
 
     def backproject(self, coefs_znkf):
         return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
@@ -86,6 +102,7 @@ class CMM:
             fs=self.fs,
             freq_minmax=self.freq_minmax,
         )
+        self.freq = np.fft.rfftfreq(self.nperseg, d=1 / self.fs)
 
     def intialize_clusters(
         self,
@@ -152,10 +169,26 @@ class CMM:
             freq_minmax=self.freq_minmax,
             x_in_coefs=True,
             y_in_coefs=True,
-            detrend=False,
+            detrend=self.detrend,
         )
 
         return coherence_mnk
+
+    def compute_crossspectrum_from_coefs(self, coefs_ymkf, coefs_xnkf):
+        pxyf, freqs = sf.estimate_spectrum(
+            coefs_ymkf,
+            coefs_xnkf,
+            fs=self.fs,
+            nperseg=self.nperseg,
+            noverlap=self.noverlap,
+            freq_minmax=self.freq_minmax,
+            x_in_coefs=True,
+            y_in_coefs=True,
+            detrend=self.detrend,
+            abs=True,
+        )
+
+        return pxyf, freqs
 
     def allocate_data_to_clusters(
         self,
@@ -175,7 +208,7 @@ class CMM:
                 freq_minmax=self.freq_minmax,
                 x_in_coefs=False,
                 y_in_coefs=False,
-                detrend=False,
+                detrend=self.detrend,
             )
         self.coherence_mn = coherence_mnk.mean(-1)
         self.labels = np.argmax(self.coherence_mn, axis=0)

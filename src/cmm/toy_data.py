@@ -1,5 +1,5 @@
 import numpy as np
-from cmm.utils import build_fft_trial_projection_matrices2
+from cmm.utils import build_fft_trial_projection_matrices
 
 
 def make_toy_data(
@@ -18,9 +18,9 @@ def make_toy_data(
 
     ft = nperseg // 2 + 1
     angles_mkf = np.random.uniform(low=0, high=2 * np.pi, size=(m, k, ft))
-    mags_mean_f = 1 * np.exp(-np.arange(ft) / ft / tau)  # variance
-    mags_mf = (np.random.normal(size=(m, ft)) * np.sqrt(mags_mean_f)[None]) ** 2
-    mags_mf = mags_mean_f[None]
+    mags_mean_f = 2 * np.exp(-np.arange(ft) / ft / tau)  # variance
+    mags_mf = np.random.normal(size=(m, ft)) * np.sqrt(mags_mean_f)[None]
+    # mags_mf = mags_mean_f[None]
     ymkf = mags_mf[:, None] * np.exp(1j * angles_mkf)
 
     angles_nkf = np.random.uniform(low=0, high=2 * np.pi, size=(n, 1, ft))
@@ -29,7 +29,7 @@ def make_toy_data(
         xnkf.append(ymkf[i] * np.exp(1j * angles_nkf))
     xnkf = np.array(xnkf).reshape([m * n, k, -1])
 
-    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices2(
+    valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
         t=t, nperseg=nperseg, noverlap=noverlap, fs=fs
     )
 

@@ -312,7 +312,8 @@ def estimate_spectrum(
     else:
         xn = xnt.shape[0]
         coefs_xnkf = xnt  # assume xnt is already N x K x F
-        freqs = sp_fft.rfftfreq(int(coefs_xnkf.shape[-1] * 2), 1 / fs)  # to check
+        f = coefs_xnkf.shape[-1]
+        freqs = sp_fft.rfftfreq(f * 2 - 1, d=1 / fs)  # to check
 
     if ynt is not None:
         if not y_in_coefs:
@@ -356,7 +357,7 @@ def estimate_spectrum(
             pxy = np.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_xnkf))
 
     if abs:
-        pxy = np.abs(pxy)
+        pxy = np.abs(pxy).real
     if normalize_per_trial:
         pxy /= kn
 
