@@ -8,14 +8,14 @@ from cmm import cmm
 from cmm import utils
 import jax.numpy as jnp
 from cmm import cmm_funcs
-from cmm.utils import build_fft_trial_projection_matrices2
+from cmm.utils import build_fft_trial_projection_matrices
 
 reload(toy_data)
 np.random.seed(4)
 path = "/Users/ruttenv/Documents/code/cmm/results/"
 t_ = 1000
 fs = 10
-nperseg = 200
+nperseg = 80
 noverlap = int(0.8 * nperseg)
 subn = 5
 m = 3
@@ -29,7 +29,7 @@ ft = nperseg // 2 + 1
 k = t // nperseg
 
 
-Wktf, iWktf = utils.build_fft_trial_projection_matrices2(
+Wktf, iWktf = utils.build_fft_trial_projection_matrices(
     t, nperseg=nperseg, noverlap=noverlap, fs=fs
 )
 
@@ -40,8 +40,8 @@ xnkf_coefs = np.tensordot(xnt, Wktf, axes=(1, 1))  # sum over t
 
 # xnkt = np.einsum("nkf, tf-> nkt", xnkf, 1 / DTF_tf).real
 # print(k, xnkf_coefs.shape[1])
-k = xnkf_coefs.shape[1]
-print(k, nperseg, t // nperseg, xnkf_coefs.shape)
+# n, k, f = xnkf_coefs.shape
+
 xnt_ = np.einsum("mkf,ktf->mt", xnkf_coefs, iWktf).real
 
 sl = slice(nperseg * 0, nperseg * 3)
@@ -52,6 +52,7 @@ pl.xlabel("time")
 pl.legend()
 pl.ylabel("backproj_single_trial")
 pl.savefig(path + "tmp")
+
 # print(xnkt.shape)
 
 # pl.figure()
@@ -74,7 +75,7 @@ pxx, freqs = sf.estimate_spectrum(
     noverlap=noverlap,
     alltoall=False,
     detrend=False,
-    normalize_per_trial=False,
+    normalize_per_trial=True,
 )
 # print(freqs.shape, nperseg)
 pl.figure()
