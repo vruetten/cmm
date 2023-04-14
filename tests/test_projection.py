@@ -1,13 +1,9 @@
-import numpy as np
-from cmm import toy_data
-import matplotlib.pyplot as pl
-from scipy.signal import coherence
-from cmm import spectral_funcs as sf
 from importlib import reload
-from cmm import cmm
-from cmm import utils
+
 import jax.numpy as jnp
-from cmm import cmm_funcs
+import matplotlib.pyplot as pl
+import numpy as np
+from cmm import cmm_funcs, toy_data
 
 reload(toy_data)
 np.random.seed(4)
@@ -28,7 +24,7 @@ n, t = xnt.shape
 freq_minmax = [-np.inf, np.inf]
 nperseg_ = 80
 noverlap_ = int(0.8 * nperseg_)
-valid_DFT_Wktf, valid_iDFT_Wktf = cmm_funcs.build_fft_trial_projection_matrices2(
+valid_DFT_Wktf, valid_iDFT_Wktf = cmm_funcs.build_fft_trial_projection_matrices(
     t, nperseg=nperseg_, noverlap=noverlap_, fs=fs, freq_minmax=freq_minmax
 )
 
