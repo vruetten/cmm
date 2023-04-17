@@ -61,7 +61,7 @@ class CMM:
                 return None
         r = self.store_results()
         np.save(savepath, r)
-        print("data saved")
+        print(f"data saved at {savepath}")
 
     def store_results(
         self,
@@ -74,7 +74,7 @@ class CMM:
         r["freq_minmax"] = self.freq_minmax
         r["xax"] = self.xax
         r["xmin"] = self.xmin
-
+        r["freq"] = self.freq
         r["xnt"] = self.xnt
         r["coefs_ymkf"] = self.coefs_ymkf
         r["coefs_xnkf"] = self.coefs_xnkf
@@ -161,21 +161,6 @@ class CMM:
             self.f = self.coefs_ymkf.shape[-1]
             self.eigvals_mf = np.zeros([self.m, self.f])
 
-    def compute_cluster_coherence(self, coherence_mnf, labels) -> np.array:
-        cluster_coherence = []
-        m, n, f = coherence_mnf.shape
-        for l in np.unique(labels):
-            cluster_coherence.append(coherence_mnf[l, labels == l].mean(0))
-            cluster_coherence.append(coherence_mnf[l, labels != l].mean(0))
-        cluster_coherence = np.array(cluster_coherence)
-        return cluster_coherence.reshape([m, 2, f])
-
-    def compute_average_phase_shift(self, coefs_xnkf, coefs_ymkf) -> np.array:
-        angles_mnf = np.angle(coefs_xnkf[None] * np.conj(coefs_ymkf[:, None])).mean(
-            axis=2
-        )
-        return angles_mnf
-
     def get_cluster_means(
         self,
     ) -> None:
@@ -254,7 +239,7 @@ class CMM:
                 y_in_coefs=False,
                 detrend=self.detrend,
             )
-        self.coherence_mn = coherence_mnk.mean(-1)
+        self.coherence_mn = coherence_mnk.mean(-1)  # average coherence over frequencies
         self.labels = np.argmax(self.coherence_mn, axis=0)
 
     def optimize(self, itemax: int, print_ite=10) -> None:
@@ -272,3 +257,26 @@ class CMM:
                 break
             else:
                 self.old_labels = self.labels
+
+
+def compute_cluster_coherence(coherence_mnf, labels) -> np.array:
+    cluster_coherence = []
+    m, n, f = coherence_mnf.shape
+    for l in np.unique(labels):
+        cluster_coherence.append(coherence_mnf[l, labels == l].mean(0))
+        cluster_coherence.append(coherence_mnf[l, labels != l].mean(0))
+    cluster_coherence_m2f = np.array(cluster_coherence).reshape([m, 2, f])
+    return cluster_coherence_m2f
+
+
+def compute_average_phase_shift(
+    coefs_xnkf: np.array, coefs_ymkf: np.array, x: int, y: int
+) -> np.array:
+    angles_mnkf = np.angle(coefs_xnkf[None] * np.conj(coefs_ymkf[:, None]))
+    m, n, k, f = angles_mnkf.shape
+    if x is not None:
+        axis = 1
+        angles_mxykf = angles_mnkf.reshape([m, x, y, k, f]).transpose([0, 3, 4, 1, 2])
+    angles_mfxy_mean = np.mean(angles_mxykf, axis=axis)
+    angles_mfxy_std = np.std(angles_mxykf, axis=axis)
+    return angles_mxykf, angles_mfxy_mean, angles_mfxy_std

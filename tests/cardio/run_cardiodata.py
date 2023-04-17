@@ -28,12 +28,13 @@ dirs_ = fs.get_subfolders(base_dir)
 folder_path = dirs_[f"exp{exp}"]
 dirs = fs.get_subfolders(folder_path)
 os.makedirs(dirs["main"] + "cmm", exist_ok=True)
+os.makedirs(dirs["main"] + "cmm/results/", exist_ok=True)
 dirs = fs.get_subfolders(folder_path)
-savepath = dirs["cmm"]
+savepath = dirs["cmm"] + "/results/"
 
 impath = glob(dirs["imag_crop"] + "*.tif")[0]
 imzarr = tf.imread(impath, aszarr=True)
-im = zarr.open(imzarr, mode="r")[: 15 * 100]
+im = zarr.open(imzarr, mode="r")[: 15 * 300]
 
 dt, dx, dy = im.shape
 fs = 15.0
@@ -45,7 +46,7 @@ freq_minmax = [1, 4]
 xnt = im.reshape([dt, dx * dy]).T
 
 opt_in_freqdom = True
-m = 5
+m = 20
 cm = cmm.CMM(
     xnt.astype("float16"),
     m=m,
@@ -56,9 +57,10 @@ cm = cmm.CMM(
     opt_in_freqdom=opt_in_freqdom,
 )
 
-cm.optimize(10)
+cm.optimize(200)
 
-cm.save_results(savepath)
+print("starting to save results")
+cm.save_results(savepath + "run")
 
 t1 = time()
 print(f"time: {int((t1-t0))}")
