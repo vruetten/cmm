@@ -51,6 +51,7 @@ class CMM:
         self.intialize_clusters()
         if self.opt_in_freqdom:
             self.initialize_coefs()
+            self.k = self.coefs_xnkf.shape[1]
 
     def save_results(self, savepath=None):
         if savepath is None:

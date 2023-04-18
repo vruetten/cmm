@@ -1,7 +1,8 @@
 import jax.numpy as jnp
 from scipy.linalg import eigh as scieigh
-from cmm.utils import build_fft_trial_projection_matrices
+from cmm.utils import build_fft_trial_projection_matrices, timeit
 from jax import vmap
+from time import time
 
 
 def compute_spectral_coefs_by_hand(
@@ -20,18 +21,18 @@ def compute_spectral_coefs_by_hand(
 
 
 def compute_cluster_mean_minimal(
-    xnt: jnp.array,
+    xnkf_coefs: jnp.array,
 ):
-    xnkf_coefs = xnt
     n, k, f = xnkf_coefs.shape
-    pn_f = jnp.sqrt(jnp.einsum("nkf, nkf->nf", xnkf_coefs, jnp.conj(xnkf_coefs)))
-    xnkf_coefs_normalized = xnkf_coefs / pn_f[:, None]
-
-    pkkf = jnp.einsum(
-        "fkn, fln->flk", xnkf_coefs_normalized, jnp.conj(xnkf_coefs_normalized)
+    xfkn_coefs = xnkf_coefs.transpose([2, 1, 0])
+    pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", xfkn_coefs, jnp.conj(xfkn_coefs)))
+    xfkn_coefs_normalized = xfkn_coefs / pf_n[:, None]
+    t0 = time()
+    pfkk = jnp.einsum(
+        "fkn, fln->flk", xfkn_coefs_normalized, jnp.conj(xfkn_coefs_normalized)
     )
-
-    Vp = [scieigh(m, subset_by_index=[k - 1, k - 1]) for m in pkkf.transpose([2, 0, 1])]
+    timeit(t0)
+    Vp = [scieigh(m, subset_by_index=[k - 1, k - 1]) for m in pfkk]
     eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
     eigvecs_p_fk = jnp.array(list(zip(*Vp))[1]).squeeze()
     return eigvecs_p_fk, eigvals_p

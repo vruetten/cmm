@@ -3,6 +3,43 @@ from numpy import fft as sp_fft
 from typing import Tuple
 
 
+def timeit(t0):
+    from time import time
+
+    t = time() - t0
+    print(f"time :{np.round(t, 5)}")
+
+
+def compute_avg_clust_dist(cluster: np.array):
+    n = cluster.shape[0]
+    clust_dist = np.abs((cluster[None] - cluster[:, None]))
+    clust_avg_dist = np.mean(clust_dist[np.triu_indices(n)])
+    return clust_avg_dist
+
+
+def compute_silhouette(coherence_mn: np.array, labels: np.array):
+    labels_unique = np.unique(labels)
+    m, n = coherence_mn.shape
+    silhouette = 0
+    for i in labels_unique:
+        inds = labels == i
+        ninds = labels != i
+        if sum(inds) == 0:
+            print("no elements in cluster - skip")
+        elif sum(ninds) == 0:
+            print("all elements in this cluster")
+        else:
+            inclust = coherence_mn[i, inds]
+            inclust_avg_dist = compute_avg_clust_dist(inclust)
+            outclust = coherence_mn[i, ninds]
+            outclust_avg_dist = compute_avg_clust_dist(outclust)
+            silhouette += (outclust_avg_dist - inclust_avg_dist) / np.max(
+                [outclust_avg_dist, inclust_avg_dist]
+            )
+    silhouette /= m
+    return silhouette
+
+
 def build_DFT_matrix(t, f, real=True):
     if real:
         if np.mod(f, 2) == 0:
