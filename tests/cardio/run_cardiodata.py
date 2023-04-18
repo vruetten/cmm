@@ -41,12 +41,13 @@ savepath = dirs["cmm"] + "/results/"
 
 impath = glob(dirs["imag_crop"] + "*.tif")[0]
 imzarr = tf.imread(impath, aszarr=True)
-im = zarr.open(imzarr, mode="r")[: 15 * 20]
+im = zarr.open(imzarr, mode="r")[: 15 * 300]
+
 
 dt, dx, dy = im.shape
 print(f"dt, dx, dy: {dt, dx, dy}")
 fs = 15.0
-nperseg = int(fs * 3)
+nperseg = int(fs * 20)
 noverlap = int(0.6 * nperseg)
 # freq_minmax = [-np.inf, np.inf]
 freq_minmax = [1, 4]
