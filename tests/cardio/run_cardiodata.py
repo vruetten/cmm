@@ -41,7 +41,7 @@ savepath = dirs["cmm"] + "/results/"
 
 impath = glob(dirs["imag_crop"] + "*.tif")[0]
 imzarr = tf.imread(impath, aszarr=True)
-im = zarr.open(imzarr, mode="r")[: 15 * 300]
+im = zarr.open(imzarr, mode="r")[: 15 * 200]
 
 
 dt, dx, dy = im.shape
@@ -49,16 +49,16 @@ print(f"dt, dx, dy: {dt, dx, dy}")
 fs = 15.0
 nperseg = int(fs * 20)
 noverlap = int(0.6 * nperseg)
-# freq_minmax = [-np.inf, np.inf]
-freq_minmax = [1, 4]
+freq_minmax = [-np.inf, np.inf]
+# freq_minmax = [1.5, 4]
 
 xnt = im.reshape([dt, dx * dy]).T
 silhouettes = []
 times = []
 scan = {}
 opt_in_freqdom = True
-# for m in range(5, 100, 20):
-for m in [15]:
+# for m in range(3, 50, 10):
+for m in [10]:
     t0 = time()
     print(m)
     cm = cmm.CMM(
@@ -71,7 +71,7 @@ for m in [15]:
         opt_in_freqdom=opt_in_freqdom,
     )
 
-    cm.optimize(200)
+    cm.optimize(300)
     t1 = time()
     tt = int(t1 - t0)
     print(f"time: {tt}")
@@ -86,4 +86,5 @@ for m in [15]:
     scan[m]["r"] = results
     scan[m]["silhouette"] = silhouettes[-1]
     scan[m]["times"] = times[-1]
-    np.save(savepath + "run_loop2", scan)
+    scan[m]["t"] = dt
+    np.save(savepath + "run_loop3_freqnolim", scan)

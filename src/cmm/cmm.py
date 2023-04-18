@@ -11,7 +11,7 @@ from cmm.cmm_funcs import (
     compute_spectral_coefs_by_hand,
 )
 from cmm.spectral_funcs import compute_coherence
-from cmm.utils import build_fft_trial_projection_matrices
+from cmm.utils import build_fft_trial_projection_matrices, get_freqs
 
 
 class CMM:
@@ -22,7 +22,7 @@ class CMM:
         fs: float,
         nperseg: int,
         noverlap=None,
-        freq_minmax=[-np.inf, np.inf],
+        freq_minmax=[0, np.inf],
         opt_in_freqdom=True,
         normalize=True,
         savepath=None,
@@ -44,6 +44,9 @@ class CMM:
         self.normalize = normalize
         self.savepath = savepath
         self.initialize()
+
+        if self.freq_minmax[0] < 0:
+            self.freq_minmax[0] = 0
 
     def initialize(
         self,
@@ -75,8 +78,10 @@ class CMM:
         r["freq_minmax"] = self.freq_minmax
         r["xax"] = self.xax
         r["xmin"] = self.xmin
-        r["freq"] = self.freq
-        r["xnt"] = self.xnt
+        r["freqs"] = self.freqs
+        r["full_freqs"] = self.full_freqs
+        r["valid_freq_inds"] = self.valid_freq_inds
+        # r["xnt"] = self.xnt
         r["coefs_ymkf"] = self.coefs_ymkf
         r["coefs_xnkf"] = self.coefs_xnkf
         if not hasattr(self, "coherence_mnf"):
@@ -144,7 +149,9 @@ class CMM:
             fs=self.fs,
             freq_minmax=self.freq_minmax,
         )
-        self.freq = np.fft.rfftfreq(self.nperseg, d=1 / self.fs)
+        self.full_freqs, self.freqs, self.valid_freq_inds = get_freqs(
+            self.coefs_xnkf.shape[-1], self.fs, self.freq_minmax
+        )
 
     def intialize_clusters(
         self,

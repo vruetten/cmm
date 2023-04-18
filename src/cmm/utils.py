@@ -83,8 +83,17 @@ def build_fft_trial_projection_matrices(
     for i in range(1, k):
         Wktf[i, i * step : i * step + nperseg] = wd_tf
         iWktf[i, i * step : i * step + nperseg] = iwd_tf
+    freqs, valid_freqs, valid_freq_inds = get_freqs(f, fs, freq_minmax)
+    return Wktf[:, :, valid_freq_inds], iWktf[:, :, valid_freq_inds]
 
-    return Wktf, iWktf
+
+def get_freqs(freqn, fs, freq_minmax):
+    freqs = sp_fft.rfftfreq(freqn * 2 - 1, d=1 / fs)  # to check
+    valid_freq_inds = (np.abs(freqs) >= freq_minmax[0]) & (
+        np.abs(freqs) <= freq_minmax[1]
+    )
+    valid_freqs = freqs[valid_freq_inds]
+    return freqs, valid_freqs, valid_freq_inds
 
 
 def foldxy(carry, x):

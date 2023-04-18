@@ -10,7 +10,7 @@ def compute_spectral_coefs_by_hand(
     nperseg: int,
     noverlap: int,
     fs: float,
-    freq_minmax=[-jnp.inf, jnp.inf],
+    freq_minmax=[0, jnp.inf],
 ):
     n, t = xnt.shape
     valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
