@@ -14,7 +14,7 @@ from scipy.linalg import eigh
 
 np.random.seed(3)
 
-n = 300
+n = 3000
 k = 100
 f = 20
 xnkf = np.random.randn(n, k, f) + 1j * np.random.randn(n, k, f)
@@ -82,15 +82,5 @@ def test_power_iteration():
     # allclose = np.allclose(myeigval, eigval)
     # print(allclose)
 
-
-t0 = time()
-eigvecs, eigvals = compute_cluster_mean_minimal(xnkf)
-print(eigvals, eigvecs.shape)
-timeit(t0)
-
-t0 = time()
-eigvecs_fast, eigvals_fast = compute_cluster_mean_minimal_fast(xnkf)
-print(eigvals_fast, eigvecs_fast.shape)
-timeit(t0)
 
 # test_power_iteration()
