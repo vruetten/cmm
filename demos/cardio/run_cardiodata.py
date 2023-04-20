@@ -13,7 +13,8 @@ import jax
 import jax.numpy as jnp
 
 # Global flag to set a specific platform, must be used at startup.
-jax.config.update("jax_platform_name", "cpu")
+# jax.config.update("jax_platform_name", "cpu")
+# jax.config.update("jax_platform_name", "gpu")
 
 pl.style.use("dark_background")
 sys.path.append("/groups/ahrens/home/ruttenv/code/zfish/")
@@ -21,7 +22,7 @@ import zarr
 from jax.lib import xla_bridge
 from zfish.util import filesys as fs
 
-print(xla_bridge.get_backend().platform)
+print(f"using: {xla_bridge.get_backend().platform}")
 
 
 base_dir = "/nrs/ahrens/Virginia_nrs/behavior_rig_flow/230304_f474_9dpf_casper/"

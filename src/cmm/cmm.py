@@ -13,6 +13,8 @@ from cmm.cmm_funcs import (
 from cmm.spectral_funcs import compute_coherence
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
 
+np.random.seed(0)
+
 
 class CMM:
     def __init__(
@@ -150,7 +152,7 @@ class CMM:
             freq_minmax=self.freq_minmax,
         )
         self.full_freqs, self.freqs, self.valid_freq_inds = get_freqs(
-            self.coefs_xnkf.shape[-1], self.fs, self.freq_minmax
+            self.nperseg, self.fs, self.freq_minmax
         )
 
     def intialize_clusters(
@@ -280,11 +282,11 @@ def compute_cluster_coherence(coherence_mnf, labels) -> np.array:
 def compute_average_phase_shift(
     coefs_xnkf: np.array, coefs_ymkf: np.array, x: int, y: int
 ) -> np.array:
-    angles_mnkf = np.angle(coefs_xnkf[None] * np.conj(coefs_ymkf[:, None]))
+    angles_mnkf = np.angle(coefs_ymkf[None] * np.conj(coefs_xnkf[:, None]))
     m, n, k, f = angles_mnkf.shape
     if x is not None:
         axis = 1
-        angles_mxykf = angles_mnkf.reshape([m, x, y, k, f]).transpose([0, 3, 4, 1, 2])
-    angles_mfxy_mean = np.mean(angles_mxykf, axis=axis)
-    angles_mfxy_std = np.std(angles_mxykf, axis=axis)
-    return angles_mxykf, angles_mfxy_mean, angles_mfxy_std
+        angles_mkfxy = angles_mnkf.reshape([m, x, y, k, f]).transpose([0, 3, 4, 1, 2])
+    angles_mfxy_mean = np.mean(angles_mkfxy, axis=axis)
+    angles_mfxy_std = np.std(angles_mkfxy, axis=axis)
+    return angles_mkfxy, angles_mfxy_mean, angles_mfxy_std

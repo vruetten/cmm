@@ -31,7 +31,6 @@ def compute_cluster_mean_minimal(
     pfkk = jnp.einsum(
         "fkn, fln->fkl", xfkn_coefs_normalized, jnp.conj(xfkn_coefs_normalized)
     )
-    # timeit(t0)
     Vp = [scieigh(m, subset_by_index=[k - 1, k - 1]) for m in pfkk]
     eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
     eigvecs_p_fk = jnp.array(list(zip(*Vp))[1]).squeeze()

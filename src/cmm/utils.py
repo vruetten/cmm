@@ -3,6 +3,10 @@ from numpy import fft as sp_fft
 from typing import Tuple
 
 
+def convert_rad_to_1(angle):
+    return ((np.rad2deg(angle) / 180) + 1) / 2
+
+
 def timeit(t0):
     from time import time
 
@@ -44,8 +48,6 @@ def build_DFT_matrix(t, f, real=True):
     if real:
         if np.mod(f, 2) == 0:
             ff = np.arange((f + 2) // 2)
-        else:
-            ff = np.arange((f + 1) // 2)
         DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
     else:
         ff = np.arange(f)
@@ -58,7 +60,7 @@ def build_fft_trial_projection_matrices(
     nperseg: int,
     noverlap: int,
     fs=1,
-    freq_minmax=[-np.inf, np.inf],
+    freq_minmax=[0, np.inf],
     win_type="hann",
 ):
     from scipy.signal.windows import get_window
@@ -83,12 +85,13 @@ def build_fft_trial_projection_matrices(
     for i in range(1, k):
         Wktf[i, i * step : i * step + nperseg] = wd_tf
         iWktf[i, i * step : i * step + nperseg] = iwd_tf
-    freqs, valid_freqs, valid_freq_inds = get_freqs(f, fs, freq_minmax)
+
+    freqs, valid_freqs, valid_freq_inds = get_freqs(nperseg, fs, freq_minmax)
     return Wktf[:, :, valid_freq_inds], iWktf[:, :, valid_freq_inds]
 
 
-def get_freqs(freqn, fs, freq_minmax):
-    freqs = sp_fft.rfftfreq(freqn * 2 - 1, d=1 / fs)  # to check
+def get_freqs(nperseg: int, fs: float, freq_minmax=[0, np.inf]):
+    freqs = sp_fft.rfftfreq(nperseg, d=1 / fs)  # to check
     valid_freq_inds = (np.abs(freqs) >= freq_minmax[0]) & (
         np.abs(freqs) <= freq_minmax[1]
     )

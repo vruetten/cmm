@@ -18,7 +18,7 @@ rpath = path + "res.npy"
 t_ = 800
 fs = 20
 nperseg = 81
-noverlap = int(0.8 * nperseg)
+noverlap = int(0.7 * nperseg)
 subn = 4
 m = 4
 freq_minmax = [0, 3]
@@ -35,10 +35,9 @@ print(f"n t: {n, t}")
 
 opt_in_freqdom = False
 opt_in_freqdom = True
-k = m
 cm = cmm.CMM(
     xnt,
-    k=k,
+    m=m,
     fs=fs,
     nperseg=nperseg,
     noverlap=noverlap,
