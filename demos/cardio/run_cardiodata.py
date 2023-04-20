@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 
 # Global flag to set a specific platform, must be used at startup.
-# jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_platform_name", "cpu")
 # jax.config.update("jax_platform_name", "gpu")
 
 pl.style.use("dark_background")
@@ -43,12 +43,14 @@ savepath = dirs["cmm"] + "/results/"
 impath = glob(dirs["imag_crop"] + "*.tif")[0]
 imzarr = tf.imread(impath, aszarr=True)
 im = zarr.open(imzarr, mode="r")[: 15 * 200]
+# im = zarr.open(imzarr, mode="r")[: 15 * 10]
 
 
 dt, dx, dy = im.shape
 print(f"dt, dx, dy: {dt, dx, dy}")
 fs = 15.0
 nperseg = int(fs * 20)
+# nperseg = int(fs * 5)
 noverlap = int(0.6 * nperseg)
 freq_minmax = [-np.inf, np.inf]
 # freq_minmax = [1.5, 4]

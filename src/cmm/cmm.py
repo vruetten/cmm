@@ -140,6 +140,9 @@ class CMM:
         self,
     ) -> None:
         self.coefs_xnkf = self.project_to_coefs(self.xnt)
+        coefs_xfkn = self.coefs_xnkf.transpose([2, 1, 0])
+        pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", coefs_xfkn, jnp.conj(coefs_xfkn)))
+        self.coefs_xnkf_normalized = (coefs_xfkn / pf_n[:, None]).transpose([2, 1, 0])
 
         (
             self.valid_DFT_Wktf,
@@ -166,38 +169,24 @@ class CMM:
         self.labels_init = np.random.randint(low=0, high=self.m, size=self.n)
         self.labels = self.labels_init
         self.means_mt = self.kmeans_init_mt
-        if self.opt_in_freqdom:
-            self.coefs_ymkf = np.array(self.project_to_coefs(self.means_mt))
-            self.f = self.coefs_ymkf.shape[-1]
-            self.eigvals_mf = np.zeros([self.m, self.f])
+        self.coefs_ymkf = np.array(self.project_to_coefs(self.means_mt))
+        self.f = self.coefs_ymkf.shape[-1]
+        self.eigvals_mf = np.zeros([self.m, self.f])
 
     def get_cluster_means(
         self,
     ) -> None:
         for i in range(self.m):
-            if self.opt_in_freqdom:
-                valid_inds = self.labels == i
-                subdata_nkf = self.coefs_xnkf[valid_inds]
-                if sum(valid_inds) == 0:
-                    print("no data point allocated")
-                    break
-                eigvecs_fk, eigvals_f = compute_cluster_mean_minimal(subdata_nkf)
-                self.coefs_ymkf[i] = eigvecs_fk.T
-                self.eigvals_mf[i] = eigvals_f
-
-            else:
-                subdata_nt = self.xnt[self.labels == i]
-                eigvec_backproj_ft, eigvals_f = compute_cluster_mean(
-                    subdata_nt,
-                    nperseg=self.nperseg,
-                    noverlap=self.noverlap,
-                    fs=self.fs,
-                    freq_minmax=self.freq_minmax,
-                    x_in_coefs=False,
-                    return_temporal_proj=True,
-                )
-
-                self.means_mt[i] = eigvecs_fk.mean(0)
+            valid_inds = self.labels == i
+            subdata_nkf = self.coefs_xnkf_normalized[valid_inds]
+            if sum(valid_inds) == 0:
+                print("no data point allocated")
+                break
+            eigvecs_fk, eigvals_f = compute_cluster_mean_minimal(
+                subdata_nkf, normalize=False
+            )
+            self.coefs_ymkf[i] = eigvecs_fk.T
+            self.eigvals_mf[i] = eigvals_f
 
     def compute_cross_coherence_from_coefs(self, coefs_ymkf, coefs_xnkf) -> np.array:
         coherence_mnk, _ = compute_coherence(

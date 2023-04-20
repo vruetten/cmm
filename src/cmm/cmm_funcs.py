@@ -22,12 +22,10 @@ def compute_spectral_coefs_by_hand(
 
 
 def compute_cluster_mean_minimal_fast(
-    xnkf_coefs: jnp.array,
+    xnkf_coefs_normalized: jnp.array,
 ):
-    n, k, f = xnkf_coefs.shape
-    xfkn_coefs = xnkf_coefs.transpose([2, 1, 0])
-    pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", xfkn_coefs, jnp.conj(xfkn_coefs)))
-    xfkn_coefs_normalized = xfkn_coefs / pf_n[:, None]
+    n, k, f = xnkf_coefs_normalized.shape
+    xfkn_coefs_normalized = xnkf_coefs_normalized.transpose([2, 1, 0])
 
     Vp = [power_iteration(m) for m in xfkn_coefs_normalized]
     eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
@@ -35,17 +33,17 @@ def compute_cluster_mean_minimal_fast(
     return eigvecs_p_fk, eigvals_p
 
 
-def compute_cluster_mean_minimal(
-    xnkf_coefs: jnp.array,
-):
-    n, k, f = xnkf_coefs.shape
-    xfkn_coefs = xnkf_coefs.transpose([2, 1, 0])
+def compute_cluster_mean_minimal(coefs_xnkf: jnp.array, normalize=False):
+    n, k, f = coefs_xnkf.shape
+    if normalize:
+        xfkn_coefs = coefs_xnkf.transpose([2, 1, 0])
+        pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", xfkn_coefs, jnp.conj(xfkn_coefs)))
+        coefs_xfkn_normalized = xfkn_coefs / pf_n[:, None]
+    else:
+        coefs_xfkn_normalized = coefs_xnkf.transpose([2, 1, 0])
 
-    pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", xfkn_coefs, jnp.conj(xfkn_coefs)))
-    xfkn_coefs_normalized = xfkn_coefs / pf_n[:, None]
-    t0 = time()
     pfkk = jnp.einsum(
-        "fkn, fln->fkl", xfkn_coefs_normalized, jnp.conj(xfkn_coefs_normalized)
+        "fkn, fln->fkl", coefs_xfkn_normalized, jnp.conj(coefs_xfkn_normalized)
     )
     Vp = [scieigh(m, subset_by_index=[k - 1, k - 1]) for m in pfkk]
     eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
