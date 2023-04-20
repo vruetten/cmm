@@ -63,8 +63,8 @@ for i in range(k):
     coh = pyxf[i, inds].mean(0)  # average coherence within cluster
     coh_ = pyxf[i, not_inds].mean(0)  # average coherence outside of cluster
     axs[i].set_title(f"cluster {i}")
-    axs[i].plot(cm.freq, coh, "o-", label="average with cluster")
-    axs[i].plot(cm.freq, coh_, "o-", label="average outside cluster")
+    axs[i].plot(cm.freqs, coh, "o-", label="average with cluster")
+    axs[i].plot(cm.freqs, coh_, "o-", label="average outside cluster")
     axs[i].legend(loc=1)
     axs[i].set_ylabel("cross spectrum")
 axs[-1].set_xlabel("freq [Hz]")
@@ -88,8 +88,8 @@ for i in range(k):
     coh = coh_mnf[i, inds].mean(0)  # average coherence within cluster
     coh_ = coh_mnf[i, not_inds].mean(0)  # average coherence outside of cluster
     axs[i].set_title(f"cluster {i}")
-    axs[i].plot(cm.freq, coh, "o-", label="average with cluster")
-    axs[i].plot(cm.freq, coh_, "o-", label="average outside cluster")
+    axs[i].plot(cm.freqs, coh, "o-", label="average with cluster")
+    axs[i].plot(cm.freqs, coh_, "o-", label="average outside cluster")
     axs[i].legend(loc=1)
     axs[i].set_ylabel("coherence")
 axs[-1].set_xlabel("freq [Hz]")

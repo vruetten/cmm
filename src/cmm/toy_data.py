@@ -17,17 +17,13 @@ def make_toy_data(
     k = (t - noverlap) // step
 
     ft = nperseg // 2 + 1
-    angles_mkf = np.random.uniform(low=0, high=2 * np.pi, size=(m, k, ft))
+    unit_circle_points = _uniform_points_on_circle((m, k, ft))
     mags_mean_f = 2 * np.exp(-np.arange(ft) / ft / tau)  # variance
     mags_mf = np.random.normal(size=(m, ft)) * np.sqrt(mags_mean_f)[None]
     # mags_mf = mags_mean_f[None]
-    ymkf = mags_mf[:, None] * np.exp(1j * angles_mkf)
+    ymkf = mags_mf[:, None] * unit_circle_points
 
-    angles_nkf = np.random.uniform(low=0, high=2 * np.pi, size=(n, 1, ft))
-    xnkf = []
-    for i in range(m):
-        xnkf.append(ymkf[i] * np.exp(1j * angles_nkf))
-    xnkf = np.array(xnkf).reshape([m * n, k, -1])
+    xnkf = (ymkf[:,None,:,:] * _uniform_points_on_circle((n, 1, ft))).reshape([m * n, k, -1])
 
     valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
         t=t, nperseg=nperseg, noverlap=noverlap, fs=fs
@@ -42,3 +38,8 @@ def make_toy_data(
     xnt += np.random.randn(n * m, t) * np.sqrt(noise)
     xax = np.arange(xnt.shape[-1]) / fs
     return xnt, ymt, xax, xnkf
+
+
+def _uniform_points_on_circle(size):
+    angles = np.random.uniform(low=0, high=2 * np.pi, size=size)
+    return np.exp(1j * angles)
