@@ -46,8 +46,7 @@ def compute_silhouette(coherence_mn: np.array, labels: np.array):
 
 def build_DFT_matrix(t, f, real=True):
     if real:
-        if np.mod(f, 2) == 0:
-            ff = np.arange((f + 2) // 2)
+        ff = np.arange((f + 2) // 2)
         DFT_tf = np.exp(-1j * 2 * np.pi * np.arange(t)[None] * ff[:, None] / t).T
     else:
         ff = np.arange(f)
