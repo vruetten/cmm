@@ -11,9 +11,9 @@ from time import time
 
 np.random.seed(0)
 
-n = 20
-k = 10
-f = 3
+n = 200
+k = 100
+f = 20
 xnkf = np.random.randn(n, k, f) + 1j * np.random.randn(n, k, f)
 xnk = xnkf[:, :, 0]
 
@@ -37,3 +37,5 @@ t0 = time()
 eigvecs_fast, eigvals_fast = compute_cluster_mean_minimal_fast(xnkf)
 print(eigvals_fast, eigvecs_fast.shape)
 timeit(t0)
+
+test_power_iteration()

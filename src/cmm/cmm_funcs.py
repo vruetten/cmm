@@ -1,6 +1,9 @@
 import jax.numpy as jnp
 from scipy.linalg import eigh as scieigh
+from scipy.sparse.linalg import LinearOperator
+
 from cmm.utils import build_fft_trial_projection_matrices, timeit
+from cmm.custom_svd import compute_first_singular_vector
 from jax import vmap
 from time import time
 from cmm.power_iteration import power_iteration
@@ -29,7 +32,7 @@ def compute_cluster_mean_minimal_fast(
     pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", xfkn_coefs, jnp.conj(xfkn_coefs)))
     xfkn_coefs_normalized = xfkn_coefs / pf_n[:, None]
 
-    Vp = [power_iteration(m) for m in xfkn_coefs_normalized]
+    Vp = [compute_first_singular_vector(m) for m in xfkn_coefs_normalized]
     eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
     eigvecs_p_fk = jnp.array(list(zip(*Vp))[1]).squeeze()
     return eigvecs_p_fk, eigvals_p
