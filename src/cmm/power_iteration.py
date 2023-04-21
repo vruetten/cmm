@@ -7,23 +7,23 @@ from jax.lax import while_loop
 def inner_product(val):
     Ank, vk, diff = val
     k = Ank.shape[1]
-    Ank_ = Ank.conj()
-    Av = Ank_ @ vk
+    Av = Ank.conj() @ vk
     AAv = Ank.T @ Av
     vk_new = AAv / jnp.linalg.norm(AAv)
-    diff = jnp.abs(vk_new - vk).sum() / k
+    diff = jnp.linalg.norm(vk_new - vk)
     return Ank, vk_new, diff
 
 
 def cond_fun(val):
     Ank, vk, diff = val
-    return diff > 0.0001
+    return diff > 0.00001
 
 
-def power_iteration(Ank: jnp.array, itemax=1000):
-    """power iteration for Akn"""
+def power_iteration(Ank: jnp.array):
+    """power iteration for Ank"""
     n, k = Ank.shape
-    vk = jnp.full(k, 1 / jnp.sqrt(k))
+    vk = jnp.arange(k) + 1j * jnp.arange(k)
+    vk = vk / jnp.linalg.norm(vk)
     init_val = (Ank, vk, 1)
     val = while_loop(cond_fun, inner_product, init_val)
     vk = val[1]
