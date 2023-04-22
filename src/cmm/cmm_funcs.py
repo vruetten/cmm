@@ -1,9 +1,8 @@
 import jax.numpy as jnp
 from scipy.linalg import eigh as scieigh
-from cmm.utils import build_fft_trial_projection_matrices, timeit
-from jax import vmap
-from time import time
-from cmm.power_iteration import power_iteration
+from cmm.utils import build_fft_trial_projection_matrices
+from cmm import power_iteration as pi
+from scipy.sparse.linalg import svds
 
 
 def compute_spectral_coefs_by_hand(
@@ -25,11 +24,21 @@ def compute_cluster_mean_minimal_fast(
     xnkf_coefs_normalized: jnp.array,
 ):
     n, k, f = xnkf_coefs_normalized.shape
-    xfkn_coefs_normalized = xnkf_coefs_normalized.transpose([2, 1, 0])
+    xfnk_coefs_normalized = xnkf_coefs_normalized.transpose([2, 0, 1])
+    Vp = [svds(m, k=1) for m in xfnk_coefs_normalized]
+    eigvals_p = jnp.array(list(zip(*Vp))[1]).squeeze()
+    eigvecs_p_fk = jnp.array(list(zip(*Vp))[2]).squeeze()
+    return eigvecs_p_fk, eigvals_p
 
-    Vp = [power_iteration(m) for m in xfkn_coefs_normalized]
-    eigvals_p = jnp.array(list(zip(*Vp))[0]).squeeze()
-    eigvecs_p_fk = jnp.array(list(zip(*Vp))[1]).squeeze()
+
+def compute_cluster_mean_minimal_power_ite(
+    xnkf_coefs_normalized: jnp.array,
+):
+    from jax import vmap
+
+    n, k, f = xnkf_coefs_normalized.shape
+    xfnk_coefs_normalized = xnkf_coefs_normalized.transpose([2, 0, 1])
+    eigvals_p, eigvecs_p_fk = vmap(pi.power_iteration_jit)(xfnk_coefs_normalized)
     return eigvecs_p_fk, eigvals_p
 
 

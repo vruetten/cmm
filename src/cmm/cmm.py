@@ -6,12 +6,14 @@ from sklearn.cluster import KMeans
 
 from cmm import spectral_funcs as sf
 from cmm.cmm_funcs import (
-    compute_cluster_mean,
     compute_cluster_mean_minimal,
+    compute_cluster_mean_minimal_fast,
     compute_spectral_coefs_by_hand,
 )
 from cmm.spectral_funcs import compute_coherence
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
+
+# import numpy as jnp
 
 np.random.seed(0)
 
@@ -185,6 +187,7 @@ class CMM:
             eigvecs_fk, eigvals_f = compute_cluster_mean_minimal(
                 subdata_nkf, normalize=False
             )
+            eigvecs_fk, eigvals_f = compute_cluster_mean_minimal_fast(subdata_nkf)
             self.coefs_ymkf[i] = eigvecs_fk.T
             self.eigvals_mf[i] = eigvals_f
 

@@ -16,7 +16,7 @@ def inner_product(val):
 
 def cond_fun(val):
     Ank, vk, diff = val
-    return diff > 0.00001
+    return diff > 0.001
 
 
 def power_iteration(Ank: jnp.array):

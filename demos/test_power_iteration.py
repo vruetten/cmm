@@ -9,38 +9,47 @@ from cmm.cmm_funcs import (
 )
 from cmm.utils import timeit
 from time import time
-
+from scipy.sparse.linalg import svds
+from scipy.linalg import svd
 
 np.random.seed(3)
 
 n = 10
 k = 5
-f = 5
+f = 8
 xnkf = np.random.randn(n, k, f) + 1j * np.random.randn(n, k, f)
 xnk = xnkf[:, :, 0]
 
-t0 = time()
-eigvecs, eigvals = compute_cluster_mean_minimal(xnkf, normalize=False)
 
-timeit(t0)
-t0 = time()
-pi_eigvals, pi_eigvecs = vmap(pi.power_iteration_jit)(xnkf.transpose([2, 0, 1]))
-timeit(t0)
+a = 1 + 1j
+b = 1 + 2j
+a /= np.linalg.norm(a)
+b /= np.linalg.norm(b)
 
-A = xnk.T @ xnk.conj()
-ev, evec = eigh(A, subset_by_index=[k - 1, k - 1])
+c = a * b
+d = a / b
+e = a * np.conj(b)
+print(c, d, e)
+# t0 = time()
+# eigvecs, eigvals = compute_cluster_mean_minimal(xnkf, normalize=False)
+
+# timeit(t0)
+# t0 = time()
+# pi_eigvals, pi_eigvecs = vmap(pi.power_iteration_jit)(xnkf.transpose([2, 0, 1]))
+# timeit(t0)
+# print(pi_eigvecs.shape)
+# A = xnk.T @ xnk.conj()
+# ev, evec = eigh(A, subset_by_index=[k - 1, k - 1])
 
 # u1, s1, vh1 = svds(xnkf[:, :, 0], k=1, tol=0)
 
-from scipy.sparse.linalg import svds
-from scipy.linalg import svd
+# u, s, vh = svd(xnkf[:, :, 0], full_matrices=False)
+# u1, s1, vh1 = svds(xnkf[:, :, 0], k=1, tol=0, which="LM")
+# print(np.allclose(u[:, 0], u1[:, 0]))
 
-u, s, vh = svd(xnkf[:, :, 0], full_matrices=False)
-u1, s1, vh1 = svds(xnkf[:, :, 0], k=1, tol=0, which="LM")
-print(np.allclose(u[:, 0], u1[:, 0]))
-
-print(u[:, 0])
-print(u1[:, 0])
+# print(u[:, 0] / u1[:, 0])
+# print(vh[0] / pi_eigvecs[0])
+# print()
 
 # vh = vh.conj(
 # print(s[0] ** 2, ev[0], pi_eigvals[0])

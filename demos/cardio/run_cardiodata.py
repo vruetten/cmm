@@ -12,6 +12,8 @@ from cmm.utils import compute_silhouette
 import jax
 import jax.numpy as jnp
 
+import numpy as jnp
+
 # Global flag to set a specific platform, must be used at startup.
 jax.config.update("jax_platform_name", "cpu")
 # jax.config.update("jax_platform_name", "gpu")

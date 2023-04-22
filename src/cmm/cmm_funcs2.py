@@ -1,6 +1,4 @@
 from scipy.linalg import eigh as scieigh
-from cmm.utils import build_fft_trial_projection_matrices
-from time import time
 from scipy.sparse.linalg import svds
 import numpy as np
 
