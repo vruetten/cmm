@@ -29,7 +29,7 @@ def full_svd_and_take_first(A):
 
 
 def truncated_svd(A):
-    decomp = TruncatedSVD(n_components=1, n_iter=7, random_state=42)
+    decomp = TruncatedSVD(n_components=1, n_iter=10, random_state=42)
     decomp.fit(A)
     return decomp.singular_values_[0]**2, decomp.components_[0].reshape(-1,1)
 
@@ -38,7 +38,7 @@ def truncated_svd(A):
 # Copyright (c) 2016-2022 TheAlgorithms and contributors
 def custom_power_iteration(A):
     error_tol = 1e-12
-    max_iterations = 100
+    max_iterations = 1000
     converged = False
     lambda_previous = 0
     iterations = 0
@@ -71,10 +71,11 @@ def unify_sign(vector_map):
 
 def print_differing_elements(elements: dict):
     reference_name, reference_val = list(elements.items())[0]
-    not_identical = [name for name, val in elements.items() if not np.allclose(reference_val, val)]
+    not_identical = [(name, err) for name, val in elements.items() if (err := np.linalg.norm(reference_val - val)) > 1e-7]
     if not_identical:
         print(f"The following elements differ (reference = '{reference_name})':")
-        print(f"\t{not_identical}")
+        for name, err in not_identical:
+            print(f"\t{name} (error = {err:.2e})")
     else:
         print("\tAll values identical!")
 
@@ -83,7 +84,7 @@ functions = [
     multiply_and_eigh,
     scipy_svds,
     full_svd_and_take_first,
-    truncated_svd,
+    #truncated_svd,
     custom_power_iteration,
 ]
 
