@@ -2,7 +2,6 @@ import numpy as np
 from numpy.random import randn, uniform, seed
 from scipy.linalg import eigh, svd
 from scipy.sparse.linalg import svds
-from sklearn.decomposition import TruncatedSVD
 from timeit import timeit
 
 # test parameters
@@ -10,7 +9,7 @@ n, k = 50, 1000
 n_timing_runs = 100
 
 seed(0)
-A = randn(n, k)
+A = randn(n, k) + 1j * randn(n, k)
 
 
 def multiply_and_eigh(A):
@@ -20,18 +19,12 @@ def multiply_and_eigh(A):
 
 def scipy_svds(A):
     _, s, Vh = svds(A, k=1)
-    return s ** 2, Vh.T
+    return s ** 2, Vh.conj().T
 
 
 def full_svd_and_take_first(A):
     _, s, Vh = svd(A, full_matrices=False)
-    return s[0] ** 2, Vh[0].reshape(-1, 1)
-
-
-def truncated_svd(A):
-    decomp = TruncatedSVD(n_components=1, n_iter=10, random_state=42)
-    decomp.fit(A)
-    return decomp.singular_values_[0]**2, decomp.components_[0].reshape(-1,1)
+    return s[0] ** 2, Vh[0].conj().reshape(-1, 1)
 
 
 # code adapted from https://github.com/TheAlgorithms/Python/blob/master/linear_algebra/src/power_iteration.py
@@ -44,14 +37,14 @@ def custom_power_iteration(A):
     iterations = 0
 
     v = uniform(size=(A.shape[1],))
-    v = v / np.linalg.norm(v)
+    v /= np.linalg.norm(v)
     while not converged:
         w = np.dot(A, v)
         alpha = np.linalg.norm(w)
         v = np.dot(A.conj().T, w)
         beta = np.linalg.norm(v)
 
-        v = v / beta
+        v /= beta
         lambda_ = (beta / alpha) ** 2
 
         error = np.abs(lambda_ - lambda_previous) / lambda_
@@ -64,9 +57,13 @@ def custom_power_iteration(A):
     return lambda_, v.reshape(-1,1)
 
 
-
 def unify_sign(vector_map):
-    return {name: np.sign(v[0])*v for name, v in vector_map.items()}
+    for v in vector_map.values():
+        if np.iscomplex(v[0]):
+            v *= np.exp(-1j * np.angle(v[0]))
+        else:
+            v *= np.sign(v[0])
+    return vector_map
 
 
 def print_differing_elements(elements: dict):
@@ -84,7 +81,6 @@ functions = [
     multiply_and_eigh,
     scipy_svds,
     full_svd_and_take_first,
-    #truncated_svd,
     custom_power_iteration,
 ]
 
@@ -92,7 +88,8 @@ eigvals = {}
 eigvecs = {}
 for func in functions:
     s, v = func(A)
-    timer = timeit(lambda: func(A), number=n_timing_runs)
+    execution = lambda: func(A)
+    timer = timeit(stmt=execution, setup=execution, number=n_timing_runs)
     print(f"Function '{func.__name__}' ({n_timing_runs} iterations) took {timer}s.")
     eigvals[func.__name__] = s
     eigvecs[func.__name__] = v
