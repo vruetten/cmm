@@ -68,7 +68,6 @@ def build_fft_trial_projection_matrices(
     step = nperseg - noverlap
     k = (t - noverlap) // step
 
-    win_kt = np.repeat(win[None], axis=0, repeats=k)
     scale = 1.0 / win.sum() ** 2
 
     DFT_ff = build_DFT_matrix(nperseg, nperseg, real=True) * scale
