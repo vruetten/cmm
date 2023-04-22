@@ -14,6 +14,9 @@ pl.style.use("dark_background")
 sys.path.append("/groups/ahrens/home/ruttenv/code/zfish/")
 from zfish.util import filesys as fs
 import zarr
+import jax
+
+jax.config.update("jax_platform_name", "cpu")
 
 
 base_dir = "/nrs/ahrens/Virginia_nrs/behavior_rig_flow/230304_f474_9dpf_casper/"
@@ -33,9 +36,8 @@ savepath = dirs["cmm"] + "/results/"
 
 impath = glob(dirs["imag_crop"] + "*.tif")[0]
 imzarr = tf.imread(impath, aszarr=True)
-im = zarr.open(imzarr, mode="r")[: 15 * 100]
+im = zarr.open(imzarr, mode="r")[: 15 * 200]
 # im = zarr.open(imzarr, mode="r")[: 15 * 200]
-# im = zarr.open(imzarr, mode="r")[: 15 * 10]
 
 
 dt, dx, dy = im.shape
@@ -55,7 +57,7 @@ opt_in_freqdom = True
 # for m in range(3, 50, 10):
 itemax = 1000
 print_ite = 500
-for m in [5]:
+for m in [10]:
     t0 = time()
     print(m)
     cm = cmm(
@@ -69,6 +71,7 @@ for m in [5]:
         print_ite=print_ite,
         method="eigh",
         # method="svds",
+        use_jax=True,
         savepath=savepath,
     )
 

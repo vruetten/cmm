@@ -1,6 +1,7 @@
 from scipy.linalg import eigh as scieigh
 from scipy.sparse.linalg import svds
 import numpy as np
+import jax.numpy as jnp
 
 
 def compute_cluster_centroid_svds(
@@ -14,10 +15,15 @@ def compute_cluster_centroid_svds(
     return eigvals_p, eigvecs_p_fk
 
 
-def compute_cluster_centroid_eigh(coefs_xnkf: np.array, normalize=False):
+def compute_cluster_centroid_eigh(coefs_xnkf: np.array, use_jax=True):
+    if use_jax:
+        einsum = jnp.einsum
+    else:
+        einsum = np.einsum
+
     n, k, f = coefs_xnkf.shape
     coefs_xfkn_normalized = coefs_xnkf.transpose([2, 1, 0])
-    pfkk = np.einsum(
+    pfkk = einsum(
         "fkn, fln->fkl", coefs_xfkn_normalized, np.conj(coefs_xfkn_normalized)
     )
     Vp = [scieigh(m, subset_by_index=[k - 1, k - 1]) for m in pfkk]

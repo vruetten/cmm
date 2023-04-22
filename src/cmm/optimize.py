@@ -7,6 +7,7 @@ from cmm.cmm_funcs2 import (
     compute_cluster_centroid_svds,
     compute_cluster_centroid_eigh,
 )
+from functools import partial
 
 
 def cmm(
@@ -20,7 +21,10 @@ def cmm(
     print_ite=500,
     method="svds",
     savepath=None,
+    use_jax=False,
 ):
+    print(f"using method: {method}")
+    print(f"using jax: {use_jax}")
     n, t = xnt.shape
     valid_DFT_Wktf, valid_iDFT_Wktf = build_fft_trial_projection_matrices(
         t, nperseg=nperseg, noverlap=noverlap, fs=fs, freq_minmax=freq_minmax
@@ -43,7 +47,7 @@ def cmm(
         compute_cluster_mean = compute_cluster_centroid_svds
     else:
         print("using eigh")
-        compute_cluster_mean = compute_cluster_centroid_eigh
+        compute_cluster_mean = partial(compute_cluster_centroid_eigh, use_jax=use_jax)
 
     def compute_cross_coherence_from_coefs(
         coefs_ymkf: np.array, coefs_xnkf: np.array
