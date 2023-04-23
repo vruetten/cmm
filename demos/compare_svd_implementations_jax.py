@@ -1,7 +1,7 @@
-import numpy as np
+import jax.numpy as jnp
 from numpy.random import randn, uniform, seed
 from scipy.linalg import eigh, svd
-from scipy.sparse.linalg import svds
+from scipy.sparse.linalg import svds, LinearOperator
 from timeit import timeit
 
 # test parameters
@@ -9,7 +9,9 @@ n, k = 2800, 750
 n_timing_runs = 10
 
 seed(0)
-A = randn(n, k) + 1j * randn(n, k)
+A = jnp.array(randn(n, k) + 1j * randn(n, k))
+
+Awrapper = LinearOperator((n,k), matvec=A.__matmul__, rmatvec=A.conj().T.__matmul__)
 
 
 def multiply_and_eigh(A):
@@ -18,7 +20,7 @@ def multiply_and_eigh(A):
 
 
 def scipy_svds(A):
-    _, s, Vh = svds(A, k=1)
+    _, s, Vh = svds(Awrapper, k=1)
     return s ** 2, Vh.conj().T
 
 
@@ -37,17 +39,17 @@ def custom_power_iteration(A):
     iterations = 0
 
     v = uniform(size=(A.shape[1],))
-    v /= np.linalg.norm(v)
+    v /= jnp.linalg.norm(v)
     while not converged:
-        w = np.dot(A, v)
-        alpha = np.linalg.norm(w)
-        v = np.dot(A.conj().T, w)
-        beta = np.linalg.norm(v)
+        w = jnp.dot(A, v)
+        alpha = jnp.linalg.norm(w)
+        v = jnp.dot(A.conj().T, w)
+        beta = jnp.linalg.norm(v)
 
         v /= beta
         lambda_ = (beta / alpha) ** 2
 
-        error = np.abs(lambda_ - lambda_previous) / lambda_
+        error = jnp.abs(lambda_ - lambda_previous) / lambda_
         lambda_previous = lambda_
         iterations += 1
 
@@ -59,16 +61,16 @@ def custom_power_iteration(A):
 
 def unify_sign(vector_map):
     for v in vector_map.values():
-        if np.iscomplex(v[0]):
-            v *= np.exp(-1j * np.angle(v[0]))
+        if jnp.iscomplex(v[0]):
+            v *= jnp.exp(-1j * jnp.angle(v[0]))
         else:
-            v *= np.sign(v[0])
+            v *= jnp.sign(v[0])
     return vector_map
 
 
 def print_differing_elements(elements: dict):
     reference_name, reference_val = list(elements.items())[0]
-    not_identical = [(name, err) for name, val in elements.items() if (err := np.linalg.norm(reference_val - val)) > 1e-7]
+    not_identical = [(name, err) for name, val in elements.items() if (err := jnp.linalg.norm(reference_val - val)) > 1e-7]
     if not_identical:
         print(f"The following elements differ (reference = '{reference_name})':")
         for name, err in not_identical:
