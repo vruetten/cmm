@@ -1,19 +1,11 @@
 from time import time
-
-import jax.numpy as jnp
 import numpy as np
 from sklearn.cluster import KMeans
-
 from cmm import spectral_funcs as sf
-from cmm.cmm_funcs import (
-    compute_cluster_mean_minimal,
-    compute_cluster_mean_minimal_fast,
-    compute_spectral_coefs_by_hand,
-)
-from cmm.spectral_funcs import compute_coherence
+from cmm.cmm_funcs2 import compute_cluster_centroid_eigh
+from cmm.spectral_funcs2 import compute_coherence
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
-
-# import numpy as jnp
+import jax.numpy as jnp
 
 np.random.seed(0)
 
@@ -27,7 +19,6 @@ class CMM:
         nperseg: int,
         noverlap=None,
         freq_minmax=[0, np.inf],
-        opt_in_freqdom=True,
         normalize=True,
         savepath=None,
     ):
@@ -43,7 +34,6 @@ class CMM:
         else:
             self.noverlap = noverlap
         self.freq_minmax = freq_minmax
-        self.opt_in_freqdom = opt_in_freqdom
         self.detrend = False
         self.normalize = normalize
         self.savepath = savepath
@@ -55,10 +45,20 @@ class CMM:
     def initialize(
         self,
     ):
+        self.xnt = self.xnt - self.xnt.mean(-1)[:, None]
+        (
+            self.valid_DFT_Wktf,
+            self.valid_iDFT_Wktf,
+        ) = build_fft_trial_projection_matrices(
+            self.t,
+            nperseg=self.nperseg,
+            noverlap=self.noverlap,
+            fs=self.fs,
+            freq_minmax=self.freq_minmax,
+        )
         self.intialize_clusters()
-        if self.opt_in_freqdom:
-            self.initialize_coefs()
-            self.k = self.coefs_xnkf.shape[1]
+        self.initialize_coefs()
+        self.k = self.coefs_xnkf.shape[1]
 
     def save_results(self, savepath=None):
         if savepath is None:
@@ -85,7 +85,6 @@ class CMM:
         r["freqs"] = self.freqs
         r["full_freqs"] = self.full_freqs
         r["valid_freq_inds"] = self.valid_freq_inds
-        # r["xnt"] = self.xnt
         r["coefs_ymkf"] = self.coefs_ymkf
         r["coefs_xnkf"] = self.coefs_xnkf
         if not hasattr(self, "coherence_mnf"):
@@ -126,16 +125,11 @@ class CMM:
         return pxnf.real, freqs
 
     def backproject(self, coefs_znkf) -> np.array:
-        return jnp.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
+        return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
 
     def project_to_coefs(self, xnt) -> np.array:
-        coefs_xnkf = compute_spectral_coefs_by_hand(
-            xnt=xnt,
-            fs=self.fs,
-            nperseg=self.nperseg,
-            noverlap=self.noverlap,
-            freq_minmax=self.freq_minmax,
-        )
+        coefs_xnkf = np.tensordot(xnt, self.valid_DFT_Wktf, axes=(1, 1))
+
         return coefs_xnkf
 
     def initialize_coefs(
@@ -143,19 +137,9 @@ class CMM:
     ) -> None:
         self.coefs_xnkf = self.project_to_coefs(self.xnt)
         coefs_xfkn = self.coefs_xnkf.transpose([2, 1, 0])
-        pf_n = jnp.sqrt(jnp.einsum("fkn, fkn->fn", coefs_xfkn, jnp.conj(coefs_xfkn)))
+        pf_n = np.sqrt(np.einsum("fkn, fkn->fn", coefs_xfkn, np.conj(coefs_xfkn)))
         self.coefs_xnkf_normalized = (coefs_xfkn / pf_n[:, None]).transpose([2, 1, 0])
 
-        (
-            self.valid_DFT_Wktf,
-            self.valid_iDFT_Wktf,
-        ) = build_fft_trial_projection_matrices(
-            self.t,
-            nperseg=self.nperseg,
-            noverlap=self.noverlap,
-            fs=self.fs,
-            freq_minmax=self.freq_minmax,
-        )
         self.full_freqs, self.freqs, self.valid_freq_inds = get_freqs(
             self.nperseg, self.fs, self.freq_minmax
         )
@@ -168,14 +152,18 @@ class CMM:
         )
         self.kmeans_init_mt = self.kmeans.cluster_centers_
 
-        self.labels_init = np.random.randint(low=0, high=self.m, size=self.n)
+        self.labels_init = np.random.randint(
+            low=0,
+            high=self.m,
+            size=self.n,
+        )
         self.labels = self.labels_init
         self.means_mt = self.kmeans_init_mt
         self.coefs_ymkf = np.array(self.project_to_coefs(self.means_mt))
         self.f = self.coefs_ymkf.shape[-1]
         self.eigvals_mf = np.zeros([self.m, self.f])
 
-    def get_cluster_means(
+    def get_cluster_centroids(
         self,
     ) -> None:
         for i in range(self.m):
@@ -184,10 +172,7 @@ class CMM:
             if sum(valid_inds) == 0:
                 print("no data point allocated")
                 break
-            eigvecs_fk, eigvals_f = compute_cluster_mean_minimal(
-                subdata_nkf, normalize=False
-            )
-            eigvecs_fk, eigvals_f = compute_cluster_mean_minimal_fast(subdata_nkf)
+            eigvals_f, eigvecs_fk = compute_cluster_centroid_eigh(subdata_nkf)
             self.coefs_ymkf[i] = eigvecs_fk.T
             self.eigvals_mf[i] = eigvals_f
 
@@ -224,41 +209,28 @@ class CMM:
     def allocate_data_to_clusters(
         self,
     ) -> None:
-        if self.opt_in_freqdom:
-            coherence_mnk = self.compute_cross_coherence_from_coefs(
-                self.coefs_ymkf, self.coefs_xnkf
-            )
-
-        else:
-            coherence_mnk, _ = compute_coherence(
-                self.means_mt,
-                self.xnt,
-                fs=self.fs,
-                nperseg=self.nperseg,
-                noverlap=self.noverlap,
-                freq_minmax=self.freq_minmax,
-                x_in_coefs=False,
-                y_in_coefs=False,
-                detrend=self.detrend,
-            )
+        coherence_mnk = self.compute_cross_coherence_from_coefs(
+            self.coefs_ymkf, self.coefs_xnkf
+        )
         self.coherence_mn = coherence_mnk.mean(-1)  # average coherence over frequencies
         self.labels = np.argmax(self.coherence_mn, axis=0)
 
     def optimize(self, itemax: int, print_ite=10) -> None:
         t0 = time()
+        labels = self.labels_init
         for ite in range(itemax):
             if np.mod(ite, print_ite) == 0:
                 t1 = time()
                 diff = np.round((t1 - t0) / 60, 2)
                 print(f"at ite: {ite}, time: {diff}mins")
-            self.old_labels = self.labels
-            self.get_cluster_means()
+            old_labels = self.labels
+            self.get_cluster_centroids()
             self.allocate_data_to_clusters()
-            if (self.labels == self.old_labels).all():
-                print(f"ite: {ite} - converged")
+            if (self.labels == old_labels).all():
+                print(f"ite: {ite} - converged - all labels stablilized")
                 break
             else:
-                self.old_labels = self.labels
+                old_labels = self.labels
 
 
 def compute_cluster_coherence(coherence_mnf, labels) -> np.array:

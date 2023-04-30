@@ -9,6 +9,8 @@ from cmm.cmm_funcs2 import (
 )
 from functools import partial
 
+np.random.seed(0)
+
 
 def cmm(
     xnt: np.array,
@@ -18,10 +20,11 @@ def cmm(
     noverlap: int,
     freq_minmax=[0, np.inf],
     itemax=1000,
-    print_ite=500,
-    method="svds",
+    print_ite=10,
+    method="eigh",
     savepath=None,
-    use_jax=False,
+    use_jax=True,
+    xy=None,
 ):
     print(f"using method: {method}")
     print(f"using jax: {use_jax}")
@@ -92,13 +95,20 @@ def cmm(
             diff = np.round((t1 - t0) / 60, 2)
             print(f"at ite: {ite}, time: {diff}mins")
         old_labels = labels
-        labels = allocate_data_to_clusters(coefs_ymkf, coefs_xnkf)
         eigvals, coefs_ymkf = compute_cluster_centroids(coefs_xnkf_normalized, labels)
+        labels = allocate_data_to_clusters(coefs_ymkf, coefs_xnkf)
         if (labels == old_labels).all():
             print(f"ite: {ite} - converged")
             break
         else:
             old_labels = labels
+    coherence_mnf = compute_cross_coherence_from_coefs(coefs_ymkf, coefs_xnkf)
+    xax = np.arange(t)
+    xmin = xax / 60
+    if xy is None:
+        labels_im = None
+    else:
+        labels_im = labels.reshape([xy[0], xy[1]])
 
     r = {}
     r["m"] = m
@@ -113,12 +123,15 @@ def cmm(
     # r["xnt"] = xnt
     r["coefs_ymkf"] = coefs_ymkf
     r["coefs_xnkf"] = coefs_xnkf
-    # r["xax"] = xax
-    # r["xmin"] = xmin
-    coherence_mnf = compute_cross_coherence_from_coefs(coefs_ymkf, coefs_xnkf)
+    r["xax"] = xax
+    r["xmin"] = xmin
+
     r["coherence_mnf"] = coherence_mnf
     r["labels"] = labels
     r["valid_iDFT_Wktf"] = valid_iDFT_Wktf
     r["valid_DFT_Wktf"] = valid_DFT_Wktf
-    if savepath is not None:
-        np.save(savepath, r)
+    r["labels_im"] = labels_im
+    # if savepath is not None:
+    #     np.save(savepath, r)
+
+    return r

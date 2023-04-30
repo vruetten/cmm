@@ -21,10 +21,7 @@ jax.config.update("jax_platform_name", "cpu")
 pl.style.use("dark_background")
 sys.path.append("/groups/ahrens/home/ruttenv/code/zfish/")
 import zarr
-from jax.lib import xla_bridge
 from zfish.util import filesys as fs
-
-print(f"using: {xla_bridge.get_backend().platform}")
 
 
 base_dir = "/nrs/ahrens/Virginia_nrs/behavior_rig_flow/230304_f474_9dpf_casper/"
@@ -52,7 +49,6 @@ dt, dx, dy = im.shape
 print(f"dt, dx, dy: {dt, dx, dy}")
 fs = 15.0
 nperseg = int(fs * 20)
-# nperseg = int(fs * 5)
 noverlap = int(0.6 * nperseg)
 freq_minmax = [-np.inf, np.inf]
 # freq_minmax = [1.5, 4]
@@ -63,7 +59,7 @@ times = []
 scan = {}
 opt_in_freqdom = True
 # for m in range(3, 50, 10):
-for m in [10]:
+for m in [15]:
     t0 = time()
     print(m)
     cm = cmm.CMM(
@@ -73,7 +69,6 @@ for m in [10]:
         nperseg=nperseg,
         noverlap=noverlap,
         freq_minmax=freq_minmax,
-        opt_in_freqdom=opt_in_freqdom,
     )
 
     cm.optimize(300)
@@ -82,14 +77,18 @@ for m in [10]:
     print(f"time: {tt}")
     print("starting to save results")
     # cm.save_results(savepath + f"run_m{m}")
-    results = cm.store_results()
-    results["xnt"] = 0
-    silhouettes.append(compute_silhouette(cm.coherence_mn, cm.labels))
-    times.append(tt)
+    # results = cm.store_results()
+    # results["xnt"] = 0
+    # silhouettes.append(compute_silhouette(cm.coherence_mn, cm.labels))
+    # times.append(tt)
 
-    scan[m] = {}
-    scan[m]["r"] = results
-    scan[m]["silhouette"] = silhouettes[-1]
-    scan[m]["times"] = times[-1]
-    scan[m]["t"] = dt
-    np.save(savepath + "run_loop3_freqnolim", scan)
+    # scan[m] = {}
+    # scan[m]["r"] = results
+    # scan[m]["silhouette"] = silhouettes[-1]
+    # scan[m]["times"] = times[-1]
+    # scan[m]["t"] = dt
+    # np.save(savepath + "run_loop3_freqnolim", scan)
+
+fig = pl.figure()
+pl.imshow(cm.labels.reshape([dx, dy]), cmap="tab20")
+pl.savefig(savepath + "labels2")
