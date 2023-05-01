@@ -21,11 +21,10 @@ def compute_avg_clust_dist(cluster: np.array):
     return clust_avg_dist
 
 
-def compute_silhouette(coherence_mn: np.array, labels: np.array):
-    labels_unique = np.unique(labels)
-    m, n = coherence_mn.shape
+def compute_silhouette(coherence_nn: np.array, labels: np.array):
+    n, n = coherence_nn.shape
     silhouette = 0
-    for i in labels_unique:
+    for ind, i in enumerate(np.unique(labels)):
         inds = labels == i
         ninds = labels != i
         if sum(inds) == 0:
@@ -33,14 +32,12 @@ def compute_silhouette(coherence_mn: np.array, labels: np.array):
         elif sum(ninds) == 0:
             print("all elements in this cluster")
         else:
-            inclust = coherence_mn[i, inds]
-            inclust_avg_dist = compute_avg_clust_dist(inclust)
-            outclust = coherence_mn[i, ninds]
-            outclust_avg_dist = compute_avg_clust_dist(outclust)
-            silhouette += (outclust_avg_dist - inclust_avg_dist) / np.max(
-                [outclust_avg_dist, inclust_avg_dist]
-            )
-    silhouette /= m
+            inclust = coherence_nn[inds, inds].mean(-1)
+            outclust = coherence_nn[inds, ninds].mean(-1)
+            diff = outclust - inclust
+            denominator = np.max(np.vstack([inclust, outclust]), axis=0)
+            sil = (diff / denominator).mean()
+            silhouette += sil
     return silhouette
 
 

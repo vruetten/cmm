@@ -2,8 +2,8 @@ from time import time
 import numpy as np
 from sklearn.cluster import KMeans
 from cmm import spectral_funcs as sf
-from cmm.cmm_funcs2 import compute_cluster_centroid_eigh
-from cmm.spectral_funcs2 import compute_coherence
+from cmm.cmm_funcs import compute_cluster_centroid_eigh
+from cmm.spectral_funcs import compute_coherence
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
 import jax.numpy as jnp
 
@@ -21,6 +21,7 @@ class CMM:
         freq_minmax=[0, np.inf],
         normalize=True,
         savepath=None,
+        dxdy=None,
     ):
         self.xnt = xnt
         self.n, self.t = xnt.shape
@@ -37,6 +38,7 @@ class CMM:
         self.detrend = False
         self.normalize = normalize
         self.savepath = savepath
+        self.dxdy = dxdy
         self.initialize()
 
         if self.freq_minmax[0] < 0:
@@ -60,57 +62,10 @@ class CMM:
         self.initialize_coefs()
         self.k = self.coefs_xnkf.shape[1]
 
-    def save_results(self, savepath=None):
-        if savepath is None:
-            if self.savepath is not None:
-                savepath = self.savepath
-            else:
-                print("need path to save to")
-                return None
-        r = self.store_results()
-        np.save(savepath, r)
-        print(f"data saved at {savepath}")
-
-    def store_results(
-        self,
-    ):
-        r = {}
-        r["m"] = self.m
-        r["fs"] = self.fs
-        r["nperseg"] = self.nperseg
-        r["noverlap"] = self.noverlap
-        r["freq_minmax"] = self.freq_minmax
-        r["xax"] = self.xax
-        r["xmin"] = self.xmin
-        r["freqs"] = self.freqs
-        r["full_freqs"] = self.full_freqs
-        r["valid_freq_inds"] = self.valid_freq_inds
-        r["coefs_ymkf"] = self.coefs_ymkf
-        r["coefs_xnkf"] = self.coefs_xnkf
-        if not hasattr(self, "coherence_mnf"):
-            self.coherence_mnf = self.compute_cross_coherence_from_coefs(
-                self.coefs_ymkf, self.coefs_xnkf
-            )
-        r["coherence_mnf"] = self.coherence_mnf
-        r["labels"] = self.labels
-        r["valid_iDFT_Wktf"] = self.valid_iDFT_Wktf
-        r["valid_DFT_Wktf"] = self.valid_DFT_Wktf
-        return r
-
     def backproj_means(
         self,
     ):
         self.ymtf = self.backproject(self.coefs_ymkf)
-
-    def analyse_results(
-        self,
-    ) -> None:
-        # back project data
-        self.xntf = self.backproject(self.coefs_xnkf)
-        self.ymtf = self.backproject(self.coefs_ymkf)
-        self.coherence_mnf = self.compute_cross_coherence_from_coefs(
-            self.coefs_ymkf, self.coefs_xnkf
-        )
 
     def estimate_spectrum(self, coefs_xnkf, x_in_coefs=True):
         pxnf, freqs = sf.estimate_spectrum(
@@ -123,14 +78,6 @@ class CMM:
             detrend=self.detrend,
         )
         return pxnf.real, freqs
-
-    def backproject(self, coefs_znkf) -> np.array:
-        return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
-
-    def project_to_coefs(self, xnt) -> np.array:
-        coefs_xnkf = np.tensordot(xnt, self.valid_DFT_Wktf, axes=(1, 1))
-
-        return coefs_xnkf
 
     def initialize_coefs(
         self,
@@ -232,25 +179,145 @@ class CMM:
             else:
                 old_labels = self.labels
 
+    def backproject(self, coefs_znkf) -> np.array:
+        return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
 
-def compute_cluster_coherence(coherence_mnf, labels) -> np.array:
+    def project_to_coefs(self, xnt) -> np.array:
+        coefs_xnkf = np.tensordot(xnt, self.valid_DFT_Wktf, axes=(1, 1))
+
+        return coefs_xnkf
+
+    def backproject_centroids(self, minmax=None):
+        self.pxf, freqs = self.estimate_spectrum(self.coefs_xnkf)
+        ymt = []
+        for ind, l in enumerate(np.unique(self.labels)):
+            weighted_iDTF_ktf = np.array(
+                self.valid_iDFT_Wktf * self.pxf[self.labels == l].mean(0)
+            )
+            if minmax is not None:
+                vfreqs = np.argwhere(
+                    (freqs > minmax[0]) & (freqs < minmax[1])
+                ).squeeze()
+                notidx = [i for i in range(len(freqs)) if i not in vfreqs]
+                weighted_iDTF_ktf[:, :, notidx] = 0
+                freqs[notidx] = 0
+            ymt.append(
+                np.einsum(
+                    "mkf,ktf->mtf", self.coefs_ymkf[l : l + 1], weighted_iDTF_ktf
+                ).real.mean(-1)
+            )
+        ymt = np.array(ymt).squeeze()
+        return ymt, freqs
+
+    def analyse_results(
+        self,
+    ) -> None:
+        # back project data
+        # self.xntf = self.backproject(self.coefs_xnkf)
+        # self.ymtf = self.backproject(self.coefs_ymkf)
+        self.coherence_mnf = self.compute_cross_coherence_from_coefs(
+            self.coefs_ymkf, self.coefs_xnkf
+        )
+        self.cluster_coherence_m2f = compute_cluster_coherence(
+            self.coherence_mnf, self.labels
+        )
+        self.ymt, _ = self.backproject_centroids()
+        if self.dxdy is not None:
+            (
+                self.angles_mkfxy,
+                self.angles_mfxy_mean,
+                self.angles_mfxy_std,
+            ) = compute_average_phase_shift(
+                self.coefs_xnkf, self.coefs_ymkf, self.dxdy[0], self.dxdy[1]
+            )
+            self.labels_im = self.labels.reshape([self.dxdy[0], self.dxdy[1]])
+        self.silhouette = self.compute_model_silhouette()
+
+    def compute_model_silhouette(
+        self,
+    ) -> np.array:
+        from .utils import compute_silhouette
+
+        coherence_nn = self.compute_cross_coherence_from_coefs(
+            self.coefs_xnkf, self.coefs_xnkf
+        )
+        silhouette = compute_silhouette(coherence_nn=coherence_nn, labels=self.labels)
+        return silhouette
+
+    def store_results(
+        self,
+    ):
+        r = {}
+        r["m"] = self.m
+        r["fs"] = self.fs
+        r["nperseg"] = self.nperseg
+        r["noverlap"] = self.noverlap
+        r["freq_minmax"] = self.freq_minmax
+        r["xax"] = self.xax
+        r["xmin"] = self.xmin
+        r["freqs"] = self.freqs
+        r["full_freqs"] = self.full_freqs
+        r["valid_freq_inds"] = self.valid_freq_inds
+        r["ymt"] = self.ymt
+        # r["coefs_ymkf"] = self.coefs_ymkf
+        # r["coefs_xnkf"] = self.coefs_xnkf
+        if not hasattr(self, "coherence_mnf"):
+            self.coherence_mnf = self.compute_cross_coherence_from_coefs(
+                self.coefs_ymkf, self.coefs_xnkf
+            )
+        r["coherence_mnf"] = self.coherence_mnf
+        r["labels"] = self.labels
+        # r["valid_iDFT_Wktf"] = self.valid_iDFT_Wktf
+        # r["valid_DFT_Wktf"] = self.valid_DFT_Wktf
+        r["cluster_coherence_m2f"] = self.cluster_coherence_m2f
+        if self.dxdy is not None:
+            r["labels_im"] = self.labels_im
+            r["angles_mf_im_mean"] = self.angles_mfxy_mean
+            r["angles_mf_im_std"] = self.angles_mfxy_std
+        if hasattr(self, "silhouette"):
+            r["silhouette"] = self.silhouette
+        return r
+
+    def save_results(self, rNone, savepath=None):
+        if savepath is None:
+            if self.savepath is not None:
+                savepath = self.savepath
+            else:
+                print("need path to save to")
+                return None
+        if r is None:
+            r = self.store_results()
+        else:
+            np.save(savepath, r)
+        print(f"data saved at {savepath}")
+
+
+def phase_shift_cluster(angles_mfxy_mean: np.array) -> np.array:
+    m, f, xy = angles_mfxy_mean.shape
+    offset = np.percentile(angles_mfxy_mean, q=50, axis=(-2, -1))
+    return np.angle(np.exp(1j * angles_mfxy_mean) * np.exp(-1j * offset))
+
+
+def compute_cluster_coherence(coherence_mnf: np.array, labels: np.array) -> np.array:
     cluster_coherence = []
     m, n, f = coherence_mnf.shape
-    for l in np.unique(labels):
-        cluster_coherence.append(coherence_mnf[l, labels == l].mean(0))
-        cluster_coherence.append(coherence_mnf[l, labels != l].mean(0))
+    for ind, l in enumerate(np.unique(labels)):
+        cluster_coherence.append(coherence_mnf[ind, labels == l].mean(0))
+        cluster_coherence.append(coherence_mnf[ind, labels != l].mean(0))
     cluster_coherence_m2f = np.array(cluster_coherence).reshape([m, 2, f])
     return cluster_coherence_m2f
 
 
 def compute_average_phase_shift(
-    coefs_xnkf: np.array, coefs_ymkf: np.array, x: int, y: int
+    coefs_xnkf: np.array, coefs_ymkf: np.array, x: int, y: int, center=True
 ) -> np.array:
-    angles_mnkf = np.angle(coefs_ymkf[None] * np.conj(coefs_xnkf[:, None]))
+    angles_mnkf = np.angle(coefs_ymkf[:, None] * np.conj(coefs_xnkf[None]))
     m, n, k, f = angles_mnkf.shape
     if x is not None:
         axis = 1
         angles_mkfxy = angles_mnkf.reshape([m, x, y, k, f]).transpose([0, 3, 4, 1, 2])
     angles_mfxy_mean = np.mean(angles_mkfxy, axis=axis)
     angles_mfxy_std = np.std(angles_mkfxy, axis=axis)
+    if center:
+        angles_mfxy_mean = phase_shift_cluster(angles_mfxy_mean)
     return angles_mkfxy, angles_mfxy_mean, angles_mfxy_std

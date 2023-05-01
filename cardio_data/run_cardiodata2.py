@@ -6,7 +6,7 @@ from time import time
 import matplotlib.pyplot as pl
 import numpy as np
 import tifffile as tf
-from cmm.optimize import cmm
+from archive.optimize import cmm
 
 import numpy as np
 

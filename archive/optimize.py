@@ -1,9 +1,9 @@
 import numpy as np
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
 from sklearn.cluster import KMeans
-from cmm.spectral_funcs2 import compute_coherence
+from cmm.spectral_funcs import compute_coherence
 from time import time
-from cmm.cmm_funcs2 import (
+from cmm.cmm_funcs import (
     compute_cluster_centroid_svds,
     compute_cluster_centroid_eigh,
 )

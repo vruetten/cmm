@@ -1,12 +1,11 @@
-import jax.numpy as jnp
+import numpy as np
 from cmm.utils import _triage_segments, make_chunks
 from numpy import fft as sp_fft
-from jax.lax import broadcast
 from cmm.utils import build_fft_trial_projection_matrices
 
 
 def compute_spectral_coefs(  # used in coherence
-    xnt: jnp.ndarray,
+    xnt: np.ndarray,
     fs=1.0,
     window="hann",
     nperseg=None,
@@ -15,7 +14,7 @@ def compute_spectral_coefs(  # used in coherence
     return_onesided=True,
     scaling="spectrum",
     axis=-1,
-    freq_minmax=[0, jnp.inf],
+    freq_minmax=[0, np.inf],
     nfft=None,
 ):
     """Compute Spectral Fourier Coefs"""
@@ -45,7 +44,7 @@ def compute_spectral_coefs(  # used in coherence
         raise ValueError("noverlap must be less than nperseg.")
 
     if return_onesided:
-        if jnp.iscomplexobj(xnt):
+        if np.iscomplexobj(xnt):
             sides = "twosided"
         else:
             sides = "onesided"
@@ -69,9 +68,7 @@ def compute_spectral_coefs(  # used in coherence
     coefs_xnkf = myfft_helper(xnt, win, detrend_func, nperseg, noverlap, nfft, sides)
     coefs_xnkf *= scale
 
-    valid_freqs = (jnp.abs(freqs) >= freq_minmax[0]) & (
-        jnp.abs(freqs) <= freq_minmax[1]
-    )
+    valid_freqs = (np.abs(freqs) >= freq_minmax[0]) & (np.abs(freqs) <= freq_minmax[1])
     freqs = freqs[valid_freqs]
     coefs_xnkf = coefs_xnkf[:, :, valid_freqs]
 
@@ -79,8 +76,8 @@ def compute_spectral_coefs(  # used in coherence
 
 
 def myfft_helper(
-    x: jnp.ndarray,
-    win: jnp.ndarray,
+    x: np.ndarray,
+    win: np.ndarray,
     detrend_func,
     nperseg: int,
     noverlap: int,
@@ -91,7 +88,7 @@ def myfft_helper(
     Calculate windowed FFT, for internal use by
     `scipy.signal._spectral_helper`.
     This is a helper function that does the main FFT calculation for
-    `_spectral helper`. All ijnp.t validation is performed there, and the
+    `_spectral helper`. All input validation is performed there, and the
     data axis is assumed to be the last axis of x. It is not designed to
     be called externally. The windows are not averaged over; the result
     from each window is returned.
@@ -106,7 +103,7 @@ def myfft_helper(
     """
     # Created strided array of data segments
     if nperseg == 1 and noverlap == 0:
-        result = x[..., jnp.newaxis]
+        result = x[..., np.newaxis]
     else:
         result = make_chunks(x, nperseg, noverlap)
 
@@ -132,7 +129,7 @@ def myfft_helper(
 
 
 def compute_coherence(
-    xnt: jnp.array,
+    xnt: np.array,
     ynt=None,
     fs=1.0,
     window="hann",
@@ -143,7 +140,7 @@ def compute_coherence(
     return_onesided=True,
     scaling="spectrum",
     axis=-1,
-    freq_minmax=[0, jnp.inf],
+    freq_minmax=[0, np.inf],
     alltoall=True,  # every x with every y
     y_in_coefs=False,
     x_in_coefs=False,
@@ -203,7 +200,7 @@ def compute_coherence(
 
 
 def estimate_spectrum(
-    xnt: jnp.array,
+    xnt: np.array,
     ynt=None,
     fs=1.0,
     window="hann",
@@ -214,7 +211,7 @@ def estimate_spectrum(
     return_onesided=True,
     scaling="spectrum",  # default scaling from scipy
     axis=-1,
-    freq_minmax=[0, jnp.inf],
+    freq_minmax=[0, np.inf],
     abs=False,
     alltoall=True,  # every x with every y
     return_coefs=False,
@@ -294,7 +291,7 @@ def estimate_spectrum(
 
     if not x_in_coefs:
         if len(xnt.shape) < 2:
-            xnt = broadcast(xnt, sizes=(1,))
+            xnt = xnt[None]
         xn = xnt.shape[0]
         coefs_xnkf, freqs = compute_spectral_coefs(
             xnt=xnt,
@@ -319,7 +316,7 @@ def estimate_spectrum(
     if ynt is not None:
         if not y_in_coefs:
             if len(ynt.shape) < 2:
-                ynt = broadcast(ynt, sizes=(1,))
+                ynt = ynt[None]
             yn = ynt.shape[0]
             coefs_ynkf, _ = compute_spectral_coefs(
                 xnt=ynt,
@@ -347,18 +344,18 @@ def estimate_spectrum(
 
     if ynt is not None:
         if alltoall:
-            pxy = jnp.einsum("nkf, mkf-> nmf", coefs_xnkf, jnp.conj(coefs_ynkf))
+            pxy = np.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_ynkf))
         else:
-            pxy = jnp.einsum("nkf, nkf-> nf", coefs_xnkf, jnp.conj(coefs_ynkf))
+            pxy = np.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_ynkf))
 
     else:
         if alltoall:
-            pxy = jnp.einsum("nkf, mkf-> nmf", coefs_xnkf, jnp.conj(coefs_xnkf))
+            pxy = np.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_xnkf))
         else:
-            pxy = jnp.einsum("nkf, nkf-> nf", coefs_xnkf, jnp.conj(coefs_xnkf))
+            pxy = np.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_xnkf))
 
     if abs:
-        pxy = jnp.abs(pxy).real
+        pxy = np.abs(pxy).real
     if normalize_per_trial:
         pxy /= kn
 
