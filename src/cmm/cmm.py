@@ -6,6 +6,7 @@ from cmm.cmm_funcs import compute_cluster_centroid_eigh
 from cmm.spectral_funcs import compute_coherence
 from cmm.utils import build_fft_trial_projection_matrices, get_freqs
 import jax.numpy as jnp
+from multiprocessing import Pool
 
 np.random.seed(0)
 
@@ -22,6 +23,7 @@ class CMM:
         normalize=True,
         savepath=None,
         dxdy=None,
+        nprocesses=None,
     ):
         self.xnt = xnt
         self.n, self.t = xnt.shape
@@ -39,10 +41,15 @@ class CMM:
         self.normalize = normalize
         self.savepath = savepath
         self.dxdy = dxdy
+        self.nprocesses = nprocesses
         self.initialize()
 
         if self.freq_minmax[0] < 0:
             self.freq_minmax[0] = 0
+        if self.freq_minmax[1] == 0:
+            self.freq_minmax[1] = np.inf
+        if min(self.dxdy) == 0:
+            self.dxdxy = None
 
     def initialize(
         self,
@@ -119,6 +126,7 @@ class CMM:
             if sum(valid_inds) == 0:
                 print("no data point allocated")
                 break
+
             eigvals_f, eigvecs_fk = compute_cluster_centroid_eigh(subdata_nkf)
             self.coefs_ymkf[i] = eigvecs_fk.T
             self.eigvals_mf[i] = eigvals_f
@@ -164,20 +172,40 @@ class CMM:
 
     def optimize(self, itemax: int, print_ite=10) -> None:
         t0 = time()
-        labels = self.labels_init
+        if self.nprocesses is not None:
+            pool = Pool(processes=self.nprocesses)
         for ite in range(itemax):
             if np.mod(ite, print_ite) == 0:
                 t1 = time()
                 diff = np.round((t1 - t0) / 60, 2)
                 print(f"at ite: {ite}, time: {diff}mins")
             old_labels = self.labels
-            self.get_cluster_centroids()
+            if self.nprocesses is None:
+                self.get_cluster_centroids()
+            else:
+                subdata = [
+                    self.coefs_xnkf_normalized[self.labels == ind]
+                    for ind in range(self.m)
+                ]
+                results = pool.map(compute_cluster_centroid_eigh, subdata)
+                for ind, r in enumerate(results):
+                    self.coefs_ymkf[ind] = r[1].T
+                    self.eigvals_mf[ind] = r[0]
+
             self.allocate_data_to_clusters()
             if (self.labels == old_labels).all():
                 print(f"ite: {ite} - converged - all labels stablilized")
+                self.convergence_ite = ite
+                t1 = time()
+                diff = np.round((t1 - t0) / 60, 2)
+                self.optimization_time = diff
                 break
             else:
                 old_labels = self.labels
+        self.convergence_ite = ite
+        t1 = time()
+        diff = np.round((t1 - t0) / 60, 2)
+        self.optimization_time = diff
 
     def backproject(self, coefs_znkf) -> np.array:
         return np.einsum("mkf,ktf->mtf", coefs_znkf, self.valid_iDFT_Wktf).real
@@ -231,7 +259,10 @@ class CMM:
                 self.coefs_xnkf, self.coefs_ymkf, self.dxdy[0], self.dxdy[1]
             )
             self.labels_im = self.labels.reshape([self.dxdy[0], self.dxdy[1]])
-        self.silhouette = self.compute_model_silhouette()
+            self.valid_clusters, self.labels_im_valid = threshold_clusters(
+                self.labels_im, self.cluster_coherence_m2f, threshold=0.7
+            )
+        self.silhouette = self.compute_model_proxy_silhouette()
 
     def compute_model_silhouette(
         self,
@@ -242,6 +273,16 @@ class CMM:
             self.coefs_xnkf, self.coefs_xnkf
         )
         silhouette = compute_silhouette(coherence_nn=coherence_nn, labels=self.labels)
+        return silhouette
+
+    def compute_model_proxy_silhouette(
+        self,
+    ) -> np.array:
+        from .utils import compute_silhouette_proxy
+
+        silhouette = compute_silhouette_proxy(
+            coherence_mn=self.coherence_mn, labels=self.labels
+        )
         return silhouette
 
     def store_results(
@@ -259,6 +300,8 @@ class CMM:
         r["full_freqs"] = self.full_freqs
         r["valid_freq_inds"] = self.valid_freq_inds
         r["ymt"] = self.ymt
+        r["convergence_ite"] = self.convergence_ite
+        r["optimization_time"] = self.optimization_time
         # r["coefs_ymkf"] = self.coefs_ymkf
         # r["coefs_xnkf"] = self.coefs_xnkf
         if not hasattr(self, "coherence_mnf"):
@@ -273,12 +316,15 @@ class CMM:
         if self.dxdy is not None:
             r["labels_im"] = self.labels_im
             r["angles_mf_im_mean"] = self.angles_mfxy_mean
-            r["angles_mf_im_std"] = self.angles_mfxy_std
+            r["dxdy"] = self.dxdy
+            r["valid_clusters"] = self.valid_clusters
+            r["labels_im_valid"] = self.labels_im_valid
+            # r["angles_mf_im_std"] = self.angles_mfxy_std
         if hasattr(self, "silhouette"):
             r["silhouette"] = self.silhouette
         return r
 
-    def save_results(self, rNone, savepath=None):
+    def save_results(self, r=None, savepath=None):
         if savepath is None:
             if self.savepath is not None:
                 savepath = self.savepath
@@ -292,10 +338,23 @@ class CMM:
         print(f"data saved at {savepath}")
 
 
+def threshold_clusters(
+    labels_im: np.array, cluster_coherence_m2f: np.array, threshold: float
+):
+    valid_clusters = np.argwhere(
+        (cluster_coherence_m2f[:, 0].max(-1) > threshold)
+    ).squeeze()
+    mask = np.isin(labels_im, valid_clusters, invert=True)
+    labels_im_valid = labels_im.copy().astype("float")
+    labels_im_valid[mask] = np.nan
+    return valid_clusters, labels_im_valid
+
+
 def phase_shift_cluster(angles_mfxy_mean: np.array) -> np.array:
-    m, f, xy = angles_mfxy_mean.shape
     offset = np.percentile(angles_mfxy_mean, q=50, axis=(-2, -1))
-    return np.angle(np.exp(1j * angles_mfxy_mean) * np.exp(-1j * offset))
+    return np.angle(
+        np.exp(1j * angles_mfxy_mean) * np.exp(-1j * offset)[:, :, None, None]
+    )
 
 
 def compute_cluster_coherence(coherence_mnf: np.array, labels: np.array) -> np.array:

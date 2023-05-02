@@ -1,6 +1,23 @@
 import numpy as np
 from numpy import fft as sp_fft
 from typing import Tuple
+import pandas as pd
+
+
+def load_data(data_path):
+    extension = data_path.split(".")[-1]
+    if "h5" in extension:
+        print("h5 data detected")
+        df = pd.read_hdf(data_path, key="data")
+        xnt = np.array(df.T)
+
+    if "npy" in extension:
+        print("numpy array detected")
+        xnt = np.load(data_path)
+    else:
+        print(f"data format not recognized: {extension}")
+        exit()
+    return xnt
 
 
 def convert_rad_to_1(angle):
@@ -19,6 +36,34 @@ def compute_avg_clust_dist(cluster: np.array):
     clust_dist = np.abs((cluster[None] - cluster[:, None]))
     clust_avg_dist = np.mean(clust_dist[np.triu_indices(n)])
     return clust_avg_dist
+
+
+def compute_silhouette_proxy(coherence_mn: np.array, labels: np.array):
+    labels_unique = np.unique(labels)
+    m, n = coherence_mn.shape
+    silhouette = 0
+    for label in labels_unique:
+        inds = labels == label
+        ninds = labels != label
+        if sum(inds) == 0:
+            print("no elements in cluster - skip")
+        elif sum(ninds) == 0:
+            print("all elements in this cluster")
+        else:
+            inclust = coherence_mn[
+                label, inds
+            ]  # coherence of all points within cluster label
+            nlabelinds = np.array([ii for ii in range(m) if ii != label])
+            outclust = coherence_mn[nlabelinds][:, inds]
+            if m > 2:
+                outclust = outclust.mean(0)
+            # average coherence with all other clusters
+            diff = inclust - outclust
+            denominator = np.max(np.vstack([inclust, outclust]), axis=0)
+            silhouette += (diff / denominator).sum()
+
+    silhouette /= n
+    return silhouette
 
 
 def compute_silhouette(coherence_nn: np.array, labels: np.array):
