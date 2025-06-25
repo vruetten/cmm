@@ -6,7 +6,7 @@
 [![CI](https://github.com/vrutten/cmm/actions/workflows/ci.yml/badge.svg)](https://github.com/vrutten/cmm/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/vrutten/cmm/branch/main/graph/badge.svg)](https://codecov.io/gh/vrutten/cmm)
 
-or for now k-Means Clustering with coherence as distance metric
+for now k-Means Clustering with coherence as distance metric
 
 Unsupervised clustering algoirthm which clusters timeseries based on coherence.
 
