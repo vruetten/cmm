@@ -1,0 +1,93 @@
+{
+  "git_sha": "a73711864e7880df94572df3e2877f4d58ab5c79",
+  "fs": 10.0,
+  "nperseg": 128,
+  "noverlap": 64,
+  "arrays": {
+    "coefs": {
+      "shape": [
+        12,
+        31,
+        65
+      ],
+      "dtype": "complex128",
+      "sha256": "19dc959ecbd07827"
+    },
+    "coefs_freqs": {
+      "shape": [
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "b695030fc929ad9c"
+    },
+    "window": {
+      "shape": [
+        128
+      ],
+      "dtype": "float64",
+      "sha256": "14b233a0a0a8cec3"
+    },
+    "psd_density": {
+      "shape": [
+        12,
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "5a57d79342fedc27"
+    },
+    "psd_density_freqs": {
+      "shape": [
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "b695030fc929ad9c"
+    },
+    "psd_spectrum": {
+      "shape": [
+        12,
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "51b577cc7fe180cb"
+    },
+    "psd_spectrum_freqs": {
+      "shape": [
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "b695030fc929ad9c"
+    },
+    "coherence": {
+      "shape": [
+        3,
+        12,
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "bc1b57dd6637a054"
+    },
+    "coherence_freqs": {
+      "shape": [
+        65
+      ],
+      "dtype": "float64",
+      "sha256": "b695030fc929ad9c"
+    },
+    "coefs_band": {
+      "shape": [
+        12,
+        31,
+        23
+      ],
+      "dtype": "complex128",
+      "sha256": "13e86220bd4b0b0b"
+    },
+    "coefs_band_freqs": {
+      "shape": [
+        23
+      ],
+      "dtype": "float64",
+      "sha256": "5b21f3d097782897"
+    }
+  }
+}
