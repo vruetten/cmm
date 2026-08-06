@@ -441,7 +441,7 @@ passes.
 |---|-------|-------------|------|
 | 0 | Benchmark on a real allocation | numbers reported, dep policy confirmed | **your sign-off before any removal** |
 | 1 | **DONE** — `spectral.py` + L1/L2 tests | scipy-exact PSD/CSD/coherence/STFT | 86 tests green; C2, C3, S1, C9, H4, H5, H6 fixed; every diff vs baseline attributed |
-| 2 | `coherence.py` + backends | `coherence_matrix`, debias, distances | backends agree to 1e-10 |
+| 2 | **DONE** — `coherence.py` | V2 matrix + `whiten=True` for V1, `debias(n_eff=K)`, `to_distance`, `effective_bins` | 43 tests green vs a naive pair-by-pair reference; thread pool gives 6.2x at N=6000; output precision follows compute dtype |
 | 3 | `kmeans.py` | `CoherenceKMeans`, jax-free | C1, C5–C8, S2 fixed; recovery tests pass |
 | 4 | `clustering.py` | absorbed from `icampsnfr/spectral.py`, Lanczos solver | vs sklearn `SpectralClustering`; Lanczos speedup + agreement confirmed on a **real** coherence graph before dense `eigh` is dropped |
 | 5 | `phase.py`, `wavelet.py`, `wiener_filter` | absorbed + Q1 repair | tests ported and passing; `wiener_filter` gets its first-ever tests |
