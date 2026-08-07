@@ -80,8 +80,15 @@ class SpectralParams:
     def __post_init__(self) -> None:
         if self.fs <= 0:
             raise ValueError(f"fs must be positive, got {self.fs}")
-        if self.nperseg < 1:
-            raise ValueError(f"nperseg must be >= 1, got {self.nperseg}")
+        if self.nperseg < 2:
+            raise ValueError(
+                f"nperseg must be >= 2, got {self.nperseg}; a single-sample "
+                "segment has no frequency content, and detrending zeroes it"
+            )
+        if self.noverlap is not None and not float(self.noverlap).is_integer():
+            raise ValueError(f"noverlap must be an integer, got {self.noverlap}")
+        if self.nfft is not None and not float(self.nfft).is_integer():
+            raise ValueError(f"nfft must be an integer, got {self.nfft}")
         if self.resolved_noverlap >= self.nperseg:
             raise ValueError(
                 f"noverlap={self.resolved_noverlap} must be < nperseg={self.nperseg}"
@@ -199,12 +206,20 @@ def resolve_window(window, nperseg: int) -> np.ndarray:
     """
     if isinstance(window, (str, tuple)):
         return np.asarray(get_window(window, nperseg), dtype=np.float64)
-    win = np.asarray(window, dtype=np.float64)
+    win = np.asarray(window)
+    if np.iscomplexobj(win):
+        raise ValueError(
+            f"window array must be real, got dtype {win.dtype}; casting would "
+            "silently discard the imaginary part"
+        )
     if win.ndim != 1:
         raise ValueError(f"window array must be 1-D, got shape {win.shape}")
     if win.size != nperseg:
         raise ValueError(f"window length {win.size} != nperseg {nperseg}")
-    return win
+    # An owned copy, so the result never aliases caller memory: the Stft that
+    # carries this window is frozen read-only, which must not reach back into
+    # an array the caller still holds.
+    return win.astype(np.float64, copy=True)
 
 
 def segment(x_nt: np.ndarray, nperseg: int, noverlap: int) -> np.ndarray:
@@ -262,9 +277,7 @@ def stft(x_nt: np.ndarray, params: SpectralParams) -> Stft:
     seg = segment(x, params.nperseg, params.resolved_noverlap)
     if params.detrend is not False:
         seg = _scipy_detrend(seg, type=params.detrend, axis=-1)
-    else:
-        seg = np.array(seg, copy=True)  # own the memory before windowing
-    seg = seg * win
+    seg = seg * win  # out-of-place, so the strided view is never written to
 
     if params.onesided:
         coefs = np.fft.rfft(seg, n=nfft, axis=-1)
@@ -289,6 +302,10 @@ def stft(x_nt: np.ndarray, params: SpectralParams) -> Stft:
             )
         coefs, freqs, factor = coefs[..., keep], freqs[keep], factor[keep]
 
+    # A frozen dataclass alone does not stop in-place writes to the arrays; a
+    # provenance record that can be silently edited is no record at all.
+    for a in (coefs, freqs, factor, win):
+        a.flags.writeable = False
     return Stft(coefs=coefs, freqs=freqs, params=params, window=win,
                 onesided_factor=factor)
 
@@ -369,3 +386,23 @@ def _check_compatible(sx: Stft, sy: Stft) -> None:
         )
     if sx.freqs.shape != sy.freqs.shape or not np.array_equal(sx.freqs, sy.freqs):
         raise ValueError("frequency axes differ; transform both with the same params")
+    # csd applies sx's normalization to the cross-spectrum, and coherence
+    # divides by psd(sx) * psd(sy) which carry their own. The constants cancel
+    # only when both transforms share them — with different windows a
+    # "coherence" is scaled by the window-power ratio and can exceed 1.
+    if sx.window.shape != sy.window.shape or not np.array_equal(sx.window, sy.window):
+        raise ValueError(
+            "windows differ between the two transforms; the normalization "
+            "constants then do not cancel and coherence is no longer bounded "
+            "by 1. Transform both inputs with the same window."
+        )
+    if sx.params.fs != sy.params.fs:
+        raise ValueError(
+            f"sampling rates differ ({sx.params.fs} vs {sy.params.fs} Hz); "
+            "the density normalization does not cancel between them"
+        )
+    if not np.array_equal(sx.onesided_factor, sy.onesided_factor):
+        raise ValueError(
+            "one-sided doubling factors differ (even/odd nfft mismatch across "
+            "the same band?); transform both with the same nfft and onesided"
+        )

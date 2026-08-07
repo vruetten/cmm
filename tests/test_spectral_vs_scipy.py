@@ -102,10 +102,11 @@ class TestPsdVsWelch:
         assert_allclose(f, f_sp, rtol=RTOL)
         assert_spectra_close(ours, ref)
 
-    def test_matches_welch_odd_nfft_has_no_nyquist_bin(self, traces):
+    @pytest.mark.parametrize("nfft", [65, 129])
+    def test_matches_welch_odd_nfft_has_no_nyquist_bin(self, traces, nfft):
         # With odd nfft every bin except DC is doubled; with even nfft the last
         # bin is unpaired Nyquist and must not be. Both paths need covering.
-        p = SpectralParams(fs=20.0, nperseg=64, nfft=129)
+        p = SpectralParams(fs=20.0, nperseg=64, nfft=nfft)
         ours, _ = psd(stft(traces, p))
         _, ref = sps.welch(traces, scaling="density", **_sp_kwargs(p))
         assert_spectra_close(ours, ref)
@@ -144,6 +145,17 @@ class TestCsdVsScipy:
         diag = np.einsum("nnf->nf", full)
         pair, _ = csd(s, pairwise=True)
         assert_spectra_close(diag, pair)
+
+    def test_alltoall_offdiagonal_matches_scipy_directly(self, traces):
+        # The diagonal cannot tell which operand is conjugated (conj(X)*X is
+        # symmetric in that choice), and Hermitian symmetry survives a global
+        # swap too. Only a distinct pair against scipy pins the phase sign,
+        # which is what delay direction is inferred from.
+        p = SpectralParams(fs=20.0, nperseg=64)
+        full, f = csd(stft(traces, p))
+        f_sp, ref = sps.csd(traces[0], traces[2], scaling="density", **_sp_kwargs(p))
+        assert_allclose(f, f_sp, rtol=RTOL)
+        assert_spectra_close(full[0, 2], ref)
 
 
 class TestCoherenceVsScipy:

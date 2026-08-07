@@ -164,6 +164,18 @@ class TestInvariants:
         assert not x.flags["C_CONTIGUOUS"]
         assert_allclose(segment(x, 16, 6), segment(np.ascontiguousarray(x), 16, 6))
 
+    def test_band_lower_bound_is_inclusive_at_an_exact_bin(self, rng):
+        # band_hz is documented inclusive. Every other band test uses bounds
+        # that fall between bins, where >= and > are indistinguishable; a
+        # caller aligning band_hz to k * fs / nperseg lands exactly on a bin
+        # and must not lose it.
+        x = rng.standard_normal((2, 512))
+        p = SpectralParams(fs=20.0, nperseg=64)
+        full = stft(x, p)
+        lo = float(full.freqs[3])
+        band = stft(x, p.with_(band_hz=(lo, 5.0)))
+        assert band.freqs[0] == lo
+
 
 class TestProvenance:
     def test_params_are_frozen(self):
@@ -185,6 +197,21 @@ class TestProvenance:
         assert m["detrend"] == "linear"
         assert m["band_hz"] == [0.5, 3.0]
         assert len(m["freq_hz"]) == m["n_freqs"]
+
+    def test_stft_arrays_are_read_only(self, rng):
+        # frozen=True only blocks rebinding the fields; the provenance promise
+        # requires the arrays themselves to reject in-place writes.
+        s = stft(rng.standard_normal((2, 512)), SpectralParams(fs=10.0, nperseg=64))
+        for name in ("coefs", "freqs", "window", "onesided_factor"):
+            with pytest.raises(ValueError, match="read-only"):
+                getattr(s, name)[...] = 0
+
+    def test_window_array_input_is_copied_not_aliased(self, rng):
+        win = np.hanning(64)
+        p = SpectralParams(fs=10.0, nperseg=64, window=win)
+        s = stft(rng.standard_normal((2, 512)), p)
+        win[:] = 0.0
+        assert s.window.max() > 0
 
     def test_stft_carries_the_frequency_axis_rather_than_deriving_it(self, rng):
         # The pre-refactor bug (C3) was reconstructing freqs from the array
@@ -209,6 +236,45 @@ class TestFailFast:
     def test_noverlap_not_less_than_nperseg(self):
         with pytest.raises(ValueError, match="must be < nperseg"):
             SpectralParams(fs=10.0, nperseg=64, noverlap=64)
+
+    def test_single_sample_nperseg(self):
+        with pytest.raises(ValueError, match="nperseg must be >= 2"):
+            SpectralParams(fs=10.0, nperseg=1)
+
+    def test_non_integer_noverlap(self):
+        # int() would silently floor 31.99999 to 31 — nearly a full sample.
+        with pytest.raises(ValueError, match="noverlap must be an integer"):
+            SpectralParams(fs=10.0, nperseg=64, noverlap=31.99999)  # type: ignore[arg-type]
+
+    def test_non_integer_nfft(self):
+        with pytest.raises(ValueError, match="nfft must be an integer"):
+            SpectralParams(fs=10.0, nperseg=64, nfft=128.7)  # type: ignore[arg-type]
+
+    def test_complex_window_array(self, rng):
+        # The input-array guard (S1) has a window-array twin: casting complex
+        # to float64 silently drops the imaginary part with only a warning.
+        p = SpectralParams(fs=10.0, nperseg=64, window=np.ones(64) + 1j)
+        with pytest.raises(ValueError, match="window array must be real"):
+            stft(rng.standard_normal((2, 512)), p)
+
+    def test_mismatched_windows(self, rng):
+        # csd carries sx's normalization; coherence divides by each side's own
+        # psd. With different windows the constants do not cancel and a
+        # perfectly coherent pair measures up to 2.09 — so this must raise.
+        x = rng.standard_normal((2, 512))
+        a = stft(x, SpectralParams(fs=10.0, nperseg=64, window="hann"))
+        b = stft(x, SpectralParams(fs=10.0, nperseg=64, window="boxcar"))
+        with pytest.raises(ValueError, match="windows differ"):
+            coherence(a, b, pairwise=True)
+
+    def test_mismatched_sampling_rates_with_identical_axes(self, rng):
+        # Zero-padding can make two different-fs transforms share a frequency
+        # grid bin for bin; the density normalization still differs.
+        x = rng.standard_normal((2, 512))
+        a = stft(x, SpectralParams(fs=10.0, nperseg=64))
+        b = stft(x, SpectralParams(fs=20.0, nperseg=64, nfft=128, band_hz=(0.0, 5.0)))
+        with pytest.raises(ValueError, match="sampling rates differ"):
+            csd(a, b, pairwise=True)
 
     def test_negative_noverlap(self):
         with pytest.raises(ValueError, match="noverlap must be >= 0"):

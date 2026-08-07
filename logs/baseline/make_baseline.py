@@ -5,6 +5,15 @@ ways (see CLAUDE.md). It is an *attribution* tool: after the Phase 1 rewrite,
 every difference against this snapshot must be explained by a named bug fix. A
 difference that cannot be explained is a new bug.
 
+PROVENANCE CAVEAT: this script runs against the *working-tree*
+``src/cmm/spectral_funcs.py``, which is ahead of anything committed — the
+committed version returns 2 values from ``compute_spectral_coefs`` (this
+script unpacks 3) and lacks ``estimate_spectrum``'s ``t=`` keyword. A git sha
+alone therefore cannot reproduce ``baseline.npz``; ``baseline_meta.json``
+records the sha256 of the actual ``spectral_funcs.py`` used, plus whether the
+tree was dirty, so the true input is at least identifiable. To make this
+reproducible from history, commit that file's current state.
+
 Run from the repo root:  python logs/baseline/make_baseline.py
 """
 
@@ -76,8 +85,24 @@ def main():
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True
     ).stdout.strip()
+    import cmm.spectral_funcs as _sf
+
+    sf_path = Path(_sf.__file__)
+    sf_dirty = bool(
+        subprocess.run(
+            ["git", "status", "--porcelain", "--", str(sf_path)],
+            capture_output=True, text=True,
+        ).stdout.strip()
+    )
+    if sf_dirty:
+        print(
+            "WARNING: spectral_funcs.py is dirty — baseline.npz depends on "
+            "uncommitted code; the git sha alone cannot reproduce it"
+        )
     meta = {
         "git_sha": sha,
+        "spectral_funcs_dirty": sf_dirty,
+        "spectral_funcs_sha256": hashlib.sha256(sf_path.read_bytes()).hexdigest()[:16],
         "fs": fs,
         "nperseg": nperseg,
         "noverlap": noverlap,

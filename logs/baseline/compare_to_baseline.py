@@ -5,6 +5,11 @@ measured ways. This script asserts that each observed change matches a *named*
 bug fix, and fails loudly on any change that does not. An unexplained
 difference is a new bug.
 
+Like make_baseline.py, check 6 (the C3 regression proof) calls the legacy
+``estimate_spectrum`` with the ``t=`` keyword that only exists in the
+*working-tree* ``spectral_funcs.py`` — it crashes against the committed
+version. See the provenance caveat in make_baseline.py.
+
 Run from the repo root:  python logs/baseline/compare_to_baseline.py
 """
 
