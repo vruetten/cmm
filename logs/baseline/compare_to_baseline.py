@@ -5,9 +5,11 @@ measured ways. This script asserts that each observed change matches a *named*
 bug fix, and fails loudly on any change that does not. An unexplained
 difference is a new bug.
 
-Like make_baseline.py, check 6 (the C3 regression proof) calls the legacy
-``estimate_spectrum`` with the ``t=`` keyword — present since commit 70e979b;
-this script crashes against earlier checkouts. See make_baseline.py.
+The legacy modules were deleted after the icampsnfr migration (Phase 7), so
+check 6 (the C3 regression proof) reproduces the deleted code's frequency-axis
+formula inline; before deletion it was verified to equal the live legacy
+output exactly (np.array_equal). Regenerating baseline.npz itself requires a
+checkout that still contains spectral_funcs.py — see make_baseline.py.
 
 Run from the repo root:  python logs/baseline/compare_to_baseline.py
 """
@@ -94,16 +96,13 @@ def main() -> None:
 
     # --- 6. C3 proper: estimate_spectrum(x_in_coefs=True) rebuilt the axis as
     #        rfftfreq(2F-1) from the coefficient count. That is the path CMM
-    #        uses internally, and it is the one that was wrong. The new API has
+    #        used internally, and it is the one that was wrong. The new API has
     #        no such path — an Stft carries its axis — so the fix is structural.
-    from cmm.spectral_funcs import estimate_spectrum
-
-    _, old_axis = estimate_spectrum(
-        np.asarray(B["coefs"]), fs=FS, nperseg=NPERSEG, noverlap=NOVERLAP,
-        x_in_coefs=True, alltoall=False, abs=True, detrend="constant",
-        t=x.shape[-1],
-    )
-    err = np.abs(np.asarray(old_axis) - np.asarray(B["coefs_freqs"])).max()
+    #        The formula below IS the deleted code's computation, reproduced
+    #        inline and checked equal to the live output before deletion.
+    f_bins = np.asarray(B["coefs"]).shape[-1]
+    old_axis = np.fft.rfftfreq(2 * f_bins - 1, d=1 / FS)
+    err = np.abs(old_axis - np.asarray(B["coefs_freqs"])).max()
     report("C3 confirmed on the x_in_coefs path, and structurally removed", err > 1e-3,
            f"old axis was wrong by up to {err:.4f} Hz "
            f"(top bin {np.asarray(old_axis)[-1]:.4f} vs true {B['coefs_freqs'][-1]:.4f}); "

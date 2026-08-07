@@ -7,10 +7,12 @@ difference that cannot be explained is a new bug.
 
 Provenance: this script needs the ``spectral_funcs.py`` that returns 3 values
 from ``compute_spectral_coefs`` and accepts ``estimate_spectrum``'s ``t=``
-keyword — committed since 70e979b ("Record the working-tree state of the
-legacy modules"); earlier commits crash here. ``baseline_meta.json`` records
-the sha256 of the file actually used and whether it was dirty, and this
-script warns loudly if the provenance would not be reproducible from git.
+keyword — committed at 70e979b ("Record the working-tree state of the
+legacy modules") and DELETED after the Phase 7 icampsnfr migration. To
+regenerate baseline.npz, run this from a checkout in that window (70e979b up
+to the deletion commit); at HEAD it fails on import, by design — the frozen
+.npz and baseline_meta.json (sha256 of the file actually used, dirty flag)
+are the durable record.
 
 Run from the repo root:  python logs/baseline/make_baseline.py
 """
@@ -23,8 +25,6 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-
-from cmm.spectral_funcs import compute_coherence, compute_spectral_coefs, estimate_spectrum
 
 OUT = Path(__file__).parent
 
@@ -43,6 +43,15 @@ def fixed_input():
 
 
 def main():
+    # Deferred import: the legacy modules are deleted at HEAD, and only this
+    # regeneration path needs them — compare_to_baseline.py imports
+    # fixed_input() from this file and must keep working.
+    from cmm.spectral_funcs import (
+        compute_coherence,
+        compute_spectral_coefs,
+        estimate_spectrum,
+    )
+
     x, fs = fixed_input()
     nperseg, noverlap = 128, 64
     out = {}

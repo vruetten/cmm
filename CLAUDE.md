@@ -65,7 +65,7 @@ against scipy first.
   results it invalidates. Old figures were computed with wrong code; that has to
   stay traceable.
 - **`icampsnfr` is the only consumer** (`/groups/ahrens/home/ruttenv/code/icampsnfr`,
-  imports `cmm.spectral_funcs` in `coherence.py`, `frc.py`, `spectrum.py`,
+  imports `cmm.spectral` in `coherence.py`, `frc.py`, `spectrum.py`,
   `traces.py`). It is also the only end-to-end integration test either package
   has. Run its suite when changing the spectral core, not at the end.
 - **Fail fast.** Raise with a message naming the offending value and the fix. No

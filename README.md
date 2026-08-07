@@ -166,6 +166,4 @@ ruff check src tests
 
 Layout: `src/cmm/` (library), `tests/`, `examples/` (analysis scripts, not
 part of the package), `derivations/` (estimator notes), `logs/` (measurement
-gates and baselines). `spectral_funcs.py`, `utils.py` and `toy_data.py` are
-frozen legacy modules kept only until the downstream `icampsnfr` migration;
-new code must not import them.
+gates and baselines).

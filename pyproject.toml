@@ -63,12 +63,6 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
-[tool.ruff.lint.per-file-ignores]
-# The legacy modules kept only until the icampsnfr migration (Phase 7).
-"src/cmm/spectral_funcs.py" = ["E", "W", "F", "I", "UP", "B", "C4", "A", "RUF"]
-"src/cmm/utils.py" = ["E", "W", "F", "I", "UP", "B", "C4", "A", "RUF"]
-"src/cmm/toy_data.py" = ["E", "W", "F", "I", "UP", "B", "C4", "A", "RUF"]
-
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
@@ -76,14 +70,6 @@ filterwarnings = ["error"]
 
 [tool.coverage.run]
 source = ["src"]
-# Legacy modules kept only for icampsnfr until its Phase 7 migration; they
-# are deliberately untested here and deleted once icampsnfr imports the new
-# modules.
-omit = [
-    "src/cmm/spectral_funcs.py",
-    "src/cmm/utils.py",
-    "src/cmm/toy_data.py",
-]
 
 [tool.coverage.report]
 exclude_lines = [
