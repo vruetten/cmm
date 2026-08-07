@@ -442,10 +442,10 @@ passes.
 | 0 | Benchmark on a real allocation | numbers reported, dep policy confirmed | **your sign-off before any removal** |
 | 1 | **DONE** — `spectral.py` + L1/L2 tests | scipy-exact PSD/CSD/coherence/STFT | 86 tests green; C2, C3, S1, C9, H4, H5, H6 fixed; every diff vs baseline attributed |
 | 2 | **DONE** — `coherence.py` | V2 matrix + `whiten=True` for V1, `debias(n_eff=K)`, `to_distance`, `effective_bins` | 43 tests green vs a naive pair-by-pair reference; thread pool gives 6.2x at N=6000; output precision follows compute dtype |
-| 3 | `kmeans.py` | `CoherenceKMeans`, jax-free | C1, C5–C8, S2 fixed; recovery tests pass |
-| 4 | `clustering.py` | absorbed from `icampsnfr/spectral.py`, Lanczos solver | vs sklearn `SpectralClustering`; Lanczos speedup + agreement confirmed on a **real** coherence graph before dense `eigh` is dropped |
+| 3 | **DONE** — `kmeans.py` (merged with row 4 and `metrics.py` pulled forward; see `phase3_clustering_plan.md`) | `CoherenceKMeans` jax-free, `clustering.py` with eigsh, `metrics.py` | C1, C5–C8, S2 fixed; 6-way triangulated recovery tests; eigsh/dense ARI 1.0; lazy `__init__` exports. Outstanding: Gate 4 (init/restarts on real data), pure-deletion commit blocked on dirty `cmm.py`/`cmm_funcs.py` |
+| 4 | **DONE** — merged into row 3 | `clustering.py` absorbed from `icampsnfr/spectral.py` with `eigsh(S, which="LA")` default | vs sklearn `SpectralClustering` ARI > 0.95; solver agreement pinned (eigenvalues, subspaces, labels) |
 | 5 | `phase.py`, `wavelet.py`, `wiener_filter` | absorbed + Q1 repair | tests ported and passing; `wiener_filter` gets its first-ever tests |
-| 6 | `metrics.py`, packaging, README, CI | one `pyproject.toml`, `setup.py` deleted | H2 fixed, CI green |
+| 6 | packaging, README, CI (`metrics.py` moved to row 3) | one `pyproject.toml`, `setup.py` deleted | H2 fixed, CI green |
 | 7 | Update `icampsnfr` | 4 import sites patched | `icampsnfr` suite green |
 | 8 | Retire scripts | `examples/`, `archive/` deleted | — |
 
