@@ -1,6 +1,6 @@
 {
-  "git_sha": "bb253fd19bcd330d7df8b72e3a5184a147ecc9c6",
-  "spectral_funcs_dirty": true,
+  "git_sha": "70e979b9f1462470d91f31932a54ee3d675b9dec",
+  "spectral_funcs_dirty": false,
   "spectral_funcs_sha256": "5d4f99773a382536",
   "fs": 10.0,
   "nperseg": 128,

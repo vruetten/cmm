@@ -5,14 +5,12 @@ ways (see CLAUDE.md). It is an *attribution* tool: after the Phase 1 rewrite,
 every difference against this snapshot must be explained by a named bug fix. A
 difference that cannot be explained is a new bug.
 
-PROVENANCE CAVEAT: this script runs against the *working-tree*
-``src/cmm/spectral_funcs.py``, which is ahead of anything committed — the
-committed version returns 2 values from ``compute_spectral_coefs`` (this
-script unpacks 3) and lacks ``estimate_spectrum``'s ``t=`` keyword. A git sha
-alone therefore cannot reproduce ``baseline.npz``; ``baseline_meta.json``
-records the sha256 of the actual ``spectral_funcs.py`` used, plus whether the
-tree was dirty, so the true input is at least identifiable. To make this
-reproducible from history, commit that file's current state.
+Provenance: this script needs the ``spectral_funcs.py`` that returns 3 values
+from ``compute_spectral_coefs`` and accepts ``estimate_spectrum``'s ``t=``
+keyword — committed since 70e979b ("Record the working-tree state of the
+legacy modules"); earlier commits crash here. ``baseline_meta.json`` records
+the sha256 of the file actually used and whether it was dirty, and this
+script warns loudly if the provenance would not be reproducible from git.
 
 Run from the repo root:  python logs/baseline/make_baseline.py
 """
