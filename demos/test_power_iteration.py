@@ -3,7 +3,7 @@ from cmm import power_iteration as pi
 from jax import vmap
 
 from scipy.linalg import eigh
-from cmm.cmm_funcs import (
+from archive.cmm_funcs import (
     compute_cluster_mean_minimal,
     compute_cluster_mean_minimal_fast,
 )

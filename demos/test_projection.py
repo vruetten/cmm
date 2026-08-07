@@ -3,7 +3,8 @@ from importlib import reload
 import jax.numpy as jnp
 import matplotlib.pyplot as pl
 import numpy as np
-from cmm import cmm_funcs, toy_data
+from archive import cmm_funcs
+from cmm import toy_data
 
 reload(toy_data)
 np.random.seed(4)

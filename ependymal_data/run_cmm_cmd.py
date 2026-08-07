@@ -29,7 +29,11 @@ fs = args.sampling_freq
 nperseg = args.nperseg
 noverlap = int(0.7 * nperseg)
 freq_minmax = [float(i) for i in args.freq_range]
-dxdy = [int(i) for i in args.dxdy]
+
+dxdy = args.dxdy
+if dxdy is not None:
+    dxdy = [int(i) for i in args.dxdy]
+
 print(f"freq minmax:{freq_minmax}")
 t0 = time()
 xnt = utils.load_data(data_path=data_path)
@@ -48,8 +52,7 @@ cm = cmm.CMM(
     nperseg=nperseg,
     noverlap=noverlap,
     freq_minmax=freq_minmax,
-    dxdy=dxdy,
-    nprocesses=2,
+    nprocesses=None,
 )
 
 cm.optimize(200)

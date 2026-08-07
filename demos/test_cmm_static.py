@@ -1,4 +1,4 @@
-from cmm import spectral_funcs as sf
+from archive import spectral_funcs as sf
 from cmm import utils
 import matplotlib.pyplot as pl
 import numpy as np

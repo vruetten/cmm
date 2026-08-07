@@ -1,6 +1,6 @@
 from cmm import utils
-from cmm import spectral_funcs as sf
-from cmm.cmm_funcs import compute_spectral_coefs_by_hand
+from archive import spectral_funcs as sf
+from archive.cmm_funcs import compute_spectral_coefs_by_hand
 import matplotlib.pyplot as pl
 import numpy as np
 import matplotlib as mpl
@@ -35,7 +35,7 @@ xnt, ymt, xax, xknf = make_toy_data(
 
 
 ###################### compute coherence from time series
-from cmm.spectral_funcs import compute_coherence
+from archive.spectral_funcs import compute_coherence
 
 coherence_yxf, freqs = compute_coherence(
     xnt[:1], xnt, fs=fs, nperseg=nperseg, noverlap=noverlap, detrend=False

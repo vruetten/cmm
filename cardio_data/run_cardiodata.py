@@ -51,17 +51,17 @@ fs = 15.0
 nperseg = int(fs * 20)
 noverlap = int(0.6 * nperseg)
 freq_minmax = [-np.inf, np.inf]
-# freq_minmax = [1.5, 4]
+freq_minmax = [1.5, 3]
 
 xnt = im.reshape([dt, dx * dy]).T
 silhouettes = []
 times = []
 scan = {}
-opt_in_freqdom = True
 # for m in range(3, 50, 10):
+nprocesses = 3
+# nprocesses = None
 for m in [15]:
     t0 = time()
-    print(m)
     cm = cmm.CMM(
         xnt,
         m=m,
@@ -69,6 +69,7 @@ for m in [15]:
         nperseg=nperseg,
         noverlap=noverlap,
         freq_minmax=freq_minmax,
+        nprocesses=nprocesses,
     )
 
     cm.optimize(300)

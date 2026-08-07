@@ -1,13 +1,14 @@
+#%%
 import numpy as np
 from cmm import toy_data
 import matplotlib.pyplot as pl
 from scipy.signal import coherence
-from cmm import spectral_funcs as sf
+# from archive import spectral_funcs as sf
 from importlib import reload
 from cmm import cmm
 from cmm import utils
 import jax.numpy as jnp
-from cmm import cmm_funcs
+from archive import cmm_funcs
 from cmm.utils import build_fft_trial_projection_matrices
 
 reload(toy_data)
@@ -84,3 +85,5 @@ pl.xlabel("freq [Hz]")
 pl.ylabel("magnitude")
 pl.savefig(path + "spectrum")
 # print(pxx.shape)
+
+#%%
