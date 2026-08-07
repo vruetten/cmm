@@ -19,7 +19,7 @@ def test_bare_import_is_lazy_and_sklearn_free():
         "import sys, cmm; "
         "heavy = [m for m in ('sklearn', 'cmm.spectral', 'cmm.coherence', "
         "'cmm.clustering', 'cmm.kmeans', 'cmm.metrics', 'cmm.phase', "
-        "'cmm.wavelet') if m in sys.modules]; "
+        "'cmm.wavelet', 'cmm.wiener') if m in sys.modules]; "
         "assert not heavy, f'import cmm eagerly loaded {heavy}'"
     )
     subprocess.run([sys.executable, "-c", code], check=True)

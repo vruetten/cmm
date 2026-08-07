@@ -4,7 +4,8 @@ Spectral core (:mod:`cmm.spectral`), band-averaged coherence matrix
 (:mod:`cmm.coherence`), and two clustering routes — coherence k-means
 (:mod:`cmm.kmeans`) and coherence spectral clustering (:mod:`cmm.clustering`)
 — with shared metrics (:mod:`cmm.metrics`). Alongside: narrowband phase
-tools (:mod:`cmm.phase`, :mod:`cmm.wavelet`).
+tools (:mod:`cmm.phase`, :mod:`cmm.wavelet`) and the directed Wiener filter
+(:mod:`cmm.wiener`).
 
 Everything below is loaded lazily (PEP 562): ``import cmm`` has no side
 effects and imports neither scipy nor sklearn until a symbol that needs them
@@ -30,7 +31,7 @@ __email__ = "vms.rutten@gmail.com"
 
 _SUBMODULES = {
     "spectral", "coherence", "clustering", "kmeans", "metrics",
-    "phase", "wavelet",
+    "phase", "wavelet", "wiener",
 }
 
 _EXPORTS = {
@@ -78,6 +79,9 @@ _EXPORTS = {
     # wavelet
     "morlet_wavelet": "wavelet",
     "wavelet_analytic": "wavelet",
+    # wiener
+    "WienerFilter": "wiener",
+    "wiener_filter": "wiener",
 }
 
 __all__ = sorted(_EXPORTS)
