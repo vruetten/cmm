@@ -152,7 +152,9 @@ class TestMatrixProperties:
         gains = rng.uniform(0.01, 100.0, size=small_stft.n_signals)
         base = coherence_matrix(small_stft, dtype=np.complex128).values
         scaled = coherence_matrix(
-            dataclasses.replace(small_stft, coefs=small_stft.coefs * gains[:, None, None]),
+            dataclasses.replace(
+                small_stft, coefs=small_stft.coefs * gains[:, None, None]
+            ),
             dtype=np.complex128,
         ).values
         assert_allclose(scaled, base, rtol=1e-9, atol=1e-11)
@@ -366,7 +368,8 @@ class TestProvenance:
         assert m["stft"]["band_hz"] == [0.1, 1.0]
 
     def test_whitened_metadata_says_v1(self, small_stft):
-        assert coherence_matrix(small_stft, whiten=True).metadata()["estimator"].startswith("V1")
+        md = coherence_matrix(small_stft, whiten=True).metadata()
+        assert md["estimator"].startswith("V1")
 
     def test_metadata_f_eff_schema_is_stable(self, small_stft):
         # Same keys however the matrix was made, so a saved-JSON consumer
@@ -379,6 +382,6 @@ class TestProvenance:
 
     def test_result_is_immutable(self, small_stft):
         c = coherence_matrix(small_stft)
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             c.n_eff = 3  # type: ignore[misc]
         assert isinstance(c, CoherenceMatrix)

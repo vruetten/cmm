@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cmm.spectral import SpectralParams, stft
 from cmm.coherence import coherence_matrix
+from cmm.spectral import SpectralParams, stft
 from cmm.synthetic import bandlimited_source, grouped_traces
 
 

@@ -45,12 +45,12 @@ import numpy as np
 from cmm.spectral import Stft
 
 __all__ = [
-    "CoherenceKMeansResult",
     "CoherenceKMeans",
+    "CoherenceKMeansResult",
+    "centroid_scores",
+    "centroid_update",
     "coherence_kmeans",
     "normalize_coefs",
-    "centroid_update",
-    "centroid_scores",
 ]
 
 
@@ -388,7 +388,7 @@ class CoherenceKMeans:
         self.on_empty = on_empty
         self.random_state = random_state
 
-    def fit(self, s: Stft | np.ndarray) -> "CoherenceKMeans":
+    def fit(self, s: Stft | np.ndarray) -> CoherenceKMeans:
         self.result_ = coherence_kmeans(
             s,
             self.n_clusters,

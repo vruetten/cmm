@@ -44,9 +44,9 @@ __all__ = [
     "CoherenceMatrix",
     "coherence_matrix",
     "debias",
-    "to_distance",
     "effective_bins",
     "finite_power_mask",
+    "to_distance",
 ]
 
 

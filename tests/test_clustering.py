@@ -115,7 +115,9 @@ class TestSolverAgreement:
     def test_low_contrast_miniature_of_the_gate2_regime(self):
         # Structured signal barely above a floor, N in the hundreds: the
         # regime where lobpcg matched eigenvalues yet produced ARI 0.39.
-        c, truth = noisy_blocks([200, 200, 200], intra=0.12, inter=0.05, noise=0.01, seed=7)
+        c, truth = noisy_blocks(
+            [200, 200, 200], intra=0.12, inter=0.05, noise=0.01, seed=7
+        )
         la = spectral_labels(c, 3, solver="eigsh")
         lb = spectral_labels(c, 3, solver="dense")
         assert adjusted_rand_score(la, lb) == 1.0

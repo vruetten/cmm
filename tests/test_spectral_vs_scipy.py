@@ -36,7 +36,7 @@ def assert_spectra_close(ours, ref, rtol=RTOL):
 
 
 def _sp_kwargs(p: SpectralParams, *, onesided: bool = True):
-    kw = dict(
+    kw = dict(  # noqa: C408 — mirrors the scipy call signature it feeds
         fs=p.fs,
         window=p.window,
         nperseg=p.nperseg,
@@ -125,7 +125,9 @@ class TestCsdVsScipy:
     @pytest.mark.parametrize("scaling", SCALINGS)
     def test_pairwise_matches_scipy_csd(self, traces, traces_rev, scaling):
         p = SpectralParams(fs=20.0, nperseg=64)
-        ours, f = csd(stft(traces, p), stft(traces_rev, p), scaling=scaling, pairwise=True)
+        ours, f = csd(
+            stft(traces, p), stft(traces_rev, p), scaling=scaling, pairwise=True
+        )
         f_sp, ref = sps.csd(traces, traces_rev, scaling=scaling, **_sp_kwargs(p))
         assert_allclose(f, f_sp, rtol=RTOL)
         assert_spectra_close(ours, ref)
@@ -171,7 +173,9 @@ class TestCoherenceVsScipy:
         # are dividing dust by dust; demanding they agree there tests nothing.
         # Every other bin must match to 1e-12.
         informative = f > 0
-        assert_allclose(ours[:, informative], ref[:, informative], rtol=RTOL, atol=1e-12)
+        assert_allclose(
+            ours[:, informative], ref[:, informative], rtol=RTOL, atol=1e-12
+        )
 
     @pytest.mark.parametrize("window", WINDOWS)
     def test_degenerate_dc_bin_stays_in_range(self, traces, traces_rev, window):
@@ -189,7 +193,7 @@ class TestCoherenceVsScipy:
         x = np.zeros((2, 512))
         x[1] = np.random.default_rng(0).standard_normal(512)
         c, _ = coherence(stft(x, p), pairwise=False)
-        assert np.isnan(c[0, 0]).all(), "dead-vs-dead should be undefined, not 0/0 noise"
+        assert np.isnan(c[0, 0]).all(), "dead-vs-dead is undefined, not 0/0 noise"
         assert np.isnan(c[0, 1]).all(), "dead-vs-live should be undefined too"
         assert np.isfinite(c[1, 1]).all()
 

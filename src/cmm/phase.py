@@ -27,9 +27,9 @@ from scipy.signal import butter, hilbert, sosfiltfilt
 
 __all__ = [
     "analytic_signal",
+    "bin_centers",
     "phase_amplitude",
     "phase_triggered_average",
-    "bin_centers",
     "valid_row_mask",
 ]
 

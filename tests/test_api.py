@@ -34,7 +34,6 @@ def test_every_advertised_name_resolves():
 
 def test_top_level_names_are_the_submodule_names():
     import cmm
-
     from cmm.coherence import coherence_matrix
     from cmm.kmeans import coherence_kmeans
     from cmm.metrics import coherence_silhouette
@@ -57,7 +56,7 @@ def test_unknown_attribute_raises_attribute_error():
     import cmm
 
     with pytest.raises(AttributeError, match="no attribute 'welch'"):
-        cmm.welch
+        _ = cmm.welch
 
 
 def test_dir_lists_the_public_api():

@@ -80,7 +80,9 @@ class TestCoherenceSilhouette:
         c = 0.5 * (c + c.T)
         np.fill_diagonal(c, 1.0)
         labels = np.repeat([0, 1, 2], n // 3)
-        scores = {coherence_silhouette(c, labels, sample_size=20, rng=s) for s in range(5)}
+        scores = {
+            coherence_silhouette(c, labels, sample_size=20, rng=s) for s in range(5)
+        }
         assert len(scores) > 1
 
 
@@ -158,7 +160,9 @@ class TestFailFast:
 
     def test_rejects_the_container(self):
         c, labels = planted_blocks([8, 8])
-        box = CoherenceMatrix(values=c, n_eff=8, f_eff=3.0, whiten=False, stft_metadata={})
+        box = CoherenceMatrix(
+            values=c, n_eff=8, f_eff=3.0, whiten=False, stft_metadata={}
+        )
         with pytest.raises(TypeError, match="CoherenceMatrix.values"):
             coherence_silhouette(box, labels)  # type: ignore[arg-type]
         with pytest.raises(TypeError, match="CoherenceMatrix.values"):

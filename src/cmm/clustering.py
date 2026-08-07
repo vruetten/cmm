@@ -42,12 +42,12 @@ from cmm.coherence import CoherenceMatrix
 
 __all__ = [
     "SpectralEmbedding",
-    "median_tau",
     "affinity_gaussian",
+    "cluster_embedding",
+    "eigengap",
+    "median_tau",
     "normalized_laplacian",
     "spectral_embedding",
-    "eigengap",
-    "cluster_embedding",
     "spectral_labels",
 ]
 
@@ -98,7 +98,9 @@ def _as_matrix(c) -> np.ndarray:
     v = c.values if isinstance(c, CoherenceMatrix) else np.asarray(c)
     v = np.asarray(v, dtype=np.float64)
     if v.ndim != 2 or v.shape[0] != v.shape[1]:
-        raise ValueError(f"expected a square (N, N) coherence matrix, got shape {v.shape}")
+        raise ValueError(
+            f"expected a square (N, N) coherence matrix, got shape {v.shape}"
+        )
     if not np.isfinite(v).all():
         n_bad = int((~np.isfinite(v)).sum())
         raise ValueError(

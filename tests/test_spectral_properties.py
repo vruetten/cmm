@@ -8,6 +8,8 @@ problem rather than returning something plausible.
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -180,7 +182,7 @@ class TestInvariants:
 class TestProvenance:
     def test_params_are_frozen(self):
         p = SpectralParams(fs=10.0, nperseg=64)
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             p.fs = 20.0  # type: ignore[misc]
 
     def test_with_returns_a_modified_copy(self):

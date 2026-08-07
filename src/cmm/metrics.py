@@ -16,7 +16,7 @@ sklearn is imported by this module only; ``import cmm`` never drags it in.
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 from sklearn.metrics import adjusted_rand_score, silhouette_score
@@ -24,10 +24,10 @@ from sklearn.metrics import adjusted_rand_score, silhouette_score
 from cmm.coherence import CoherenceMatrix, to_distance
 
 __all__ = [
-    "coherence_silhouette",
-    "pairwise_ari",
-    "label_stability",
     "cluster_summary",
+    "coherence_silhouette",
+    "label_stability",
+    "pairwise_ari",
 ]
 
 
@@ -36,7 +36,9 @@ def _check_matrix_and_labels(values, labels_n) -> tuple[np.ndarray, np.ndarray]:
         raise TypeError("pass CoherenceMatrix.values, not the container")
     v = np.asarray(values, dtype=np.float64)
     if v.ndim != 2 or v.shape[0] != v.shape[1]:
-        raise ValueError(f"expected a square (N, N) coherence matrix, got shape {v.shape}")
+        raise ValueError(
+            f"expected a square (N, N) coherence matrix, got shape {v.shape}"
+        )
     labels = np.asarray(labels_n)
     if labels.shape != (v.shape[0],):
         raise ValueError(

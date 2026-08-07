@@ -32,7 +32,6 @@ from cmm.kmeans import (
 from cmm.spectral import SpectralParams, coherence, stft
 from cmm.synthetic import bandlimited_source, grouped_traces
 
-
 PARAMS = SpectralParams(fs=8.0, nperseg=256, band_hz=(0.2, 1.5))
 
 
@@ -347,7 +346,7 @@ class TestProvenance:
     def test_result_is_frozen(self, grouped):
         s, _ = grouped
         r = coherence_kmeans(s, 3)
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             r.n_iter = 0  # type: ignore[misc]
 
     def test_class_wrapper_fit_predict_roundtrip(self, grouped):

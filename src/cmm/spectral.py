@@ -37,11 +37,11 @@ from scipy.signal.windows import get_window
 __all__ = [
     "SpectralParams",
     "Stft",
-    "stft",
-    "psd",
-    "csd",
     "coherence",
+    "csd",
+    "psd",
     "segment",
+    "stft",
 ]
 
 Scaling = Literal["density", "spectrum"]
@@ -106,7 +106,9 @@ class SpectralParams:
         if self.band_hz is not None:
             lo, hi = self.band_hz
             if not lo < hi:
-                raise ValueError(f"band_hz must be (low, high) with low < high, got {self.band_hz}")
+                raise ValueError(
+                    f"band_hz must be (low, high) with low < high, got {self.band_hz}"
+                )
             if lo < 0:
                 raise ValueError(f"band_hz low must be >= 0, got {lo}")
 
@@ -163,7 +165,7 @@ class Stft:
 
     @property
     def n_segments(self) -> int:
-        """K. This — not the number of frequency bins — sets the coherence bias floor."""
+        """K. This — not the frequency bin count — sets the coherence bias floor."""
         return self.coefs.shape[1]
 
     @property
@@ -204,7 +206,7 @@ def resolve_window(window, nperseg: int) -> np.ndarray:
     Raises rather than warning on a length mismatch — a silently resized window
     changes every normalization downstream.
     """
-    if isinstance(window, (str, tuple)):
+    if isinstance(window, str | tuple):
         return np.asarray(get_window(window, nperseg), dtype=np.float64)
     win = np.asarray(window)
     if np.iscomplexobj(win):
@@ -238,8 +240,8 @@ def segment(x_nt: np.ndarray, nperseg: int, noverlap: int) -> np.ndarray:
         raise ValueError(
             f"nperseg={nperseg} exceeds the record length {x.shape[-1]}"
         )
-    shape = x.shape[:-1] + (n_seg, nperseg)
-    strides = x.strides[:-1] + (step * x.strides[-1], x.strides[-1])
+    shape = (*x.shape[:-1], n_seg, nperseg)
+    strides = (*x.strides[:-1], step * x.strides[-1], x.strides[-1])
     return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides)
 
 
@@ -321,7 +323,11 @@ def psd(s: Stft, scaling: Scaling = "density") -> tuple[np.ndarray, np.ndarray]:
 
 
 def csd(
-    sx: Stft, sy: Stft | None = None, scaling: Scaling = "density", *, pairwise: bool = False
+    sx: Stft,
+    sy: Stft | None = None,
+    scaling: Scaling = "density",
+    *,
+    pairwise: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Cross-spectral density, scipy's ``conj(X) * Y`` convention.
 
