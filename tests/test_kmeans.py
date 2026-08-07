@@ -30,29 +30,7 @@ from cmm.kmeans import (
     normalize_coefs,
 )
 from cmm.spectral import SpectralParams, coherence, stft
-
-
-# --------------------------------------------------------------------------
-# Toy data with known group structure: one independent band-limited source
-# per group plus per-signal noise. Not phase-shifted sinusoids — a sinusoid
-# is coherent with everything at its own frequency.
-# --------------------------------------------------------------------------
-def bandlimited_source(rng, t, fs, band=(0.3, 1.2)):
-    spec = np.fft.rfft(rng.standard_normal(t))
-    freqs = np.fft.rfftfreq(t, 1 / fs)
-    spec[(freqs < band[0]) | (freqs > band[1])] = 0.0
-    src = np.fft.irfft(spec, t)
-    return src / src.std()
-
-
-def grouped_traces(sizes, t=3072, fs=8.0, snr=2.0, seed=0):
-    rng = np.random.default_rng(seed)
-    labels = np.repeat(np.arange(len(sizes)), sizes)
-    x = rng.standard_normal((labels.size, t))
-    for g in range(len(sizes)):
-        src = bandlimited_source(rng, t, fs)
-        x[labels == g] += snr * src
-    return x, labels
+from cmm.synthetic import bandlimited_source, grouped_traces
 
 
 PARAMS = SpectralParams(fs=8.0, nperseg=256, band_hz=(0.2, 1.5))

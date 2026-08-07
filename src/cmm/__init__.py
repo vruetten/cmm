@@ -31,7 +31,7 @@ __email__ = "vms.rutten@gmail.com"
 
 _SUBMODULES = {
     "spectral", "coherence", "clustering", "kmeans", "metrics",
-    "phase", "wavelet", "wiener",
+    "phase", "wavelet", "wiener", "synthetic",
 }
 
 _EXPORTS = {
@@ -82,6 +82,9 @@ _EXPORTS = {
     # wiener
     "WienerFilter": "wiener",
     "wiener_filter": "wiener",
+    # synthetic
+    "bandlimited_source": "synthetic",
+    "grouped_traces": "synthetic",
 }
 
 __all__ = sorted(_EXPORTS)
