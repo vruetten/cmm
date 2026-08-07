@@ -3,7 +3,8 @@
 Spectral core (:mod:`cmm.spectral`), band-averaged coherence matrix
 (:mod:`cmm.coherence`), and two clustering routes — coherence k-means
 (:mod:`cmm.kmeans`) and coherence spectral clustering (:mod:`cmm.clustering`)
-— with shared metrics (:mod:`cmm.metrics`).
+— with shared metrics (:mod:`cmm.metrics`). Alongside: narrowband phase
+tools (:mod:`cmm.phase`, :mod:`cmm.wavelet`).
 
 Everything below is loaded lazily (PEP 562): ``import cmm`` has no side
 effects and imports neither scipy nor sklearn until a symbol that needs them
@@ -27,7 +28,10 @@ except PackageNotFoundError:
 __author__ = "Virginia M.S. Rutten"
 __email__ = "vms.rutten@gmail.com"
 
-_SUBMODULES = {"spectral", "coherence", "clustering", "kmeans", "metrics"}
+_SUBMODULES = {
+    "spectral", "coherence", "clustering", "kmeans", "metrics",
+    "phase", "wavelet",
+}
 
 _EXPORTS = {
     # spectral
@@ -65,6 +69,15 @@ _EXPORTS = {
     "pairwise_ari": "metrics",
     "label_stability": "metrics",
     "cluster_summary": "metrics",
+    # phase
+    "analytic_signal": "phase",
+    "phase_amplitude": "phase",
+    "phase_triggered_average": "phase",
+    "bin_centers": "phase",
+    "valid_row_mask": "phase",
+    # wavelet
+    "morlet_wavelet": "wavelet",
+    "wavelet_analytic": "wavelet",
 }
 
 __all__ = sorted(_EXPORTS)
