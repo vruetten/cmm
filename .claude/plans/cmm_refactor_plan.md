@@ -444,10 +444,10 @@ passes.
 | 2 | **DONE** — `coherence.py` | V2 matrix + `whiten=True` for V1, `debias(n_eff=K)`, `to_distance`, `effective_bins` | 43 tests green vs a naive pair-by-pair reference; thread pool gives 6.2x at N=6000; output precision follows compute dtype |
 | 3 | **DONE** — `kmeans.py` (merged with row 4 and `metrics.py` pulled forward; see `phase3_clustering_plan.md`) | `CoherenceKMeans` jax-free, `clustering.py` with eigsh, `metrics.py` | C1, C5–C8, S2 fixed; 6-way triangulated recovery tests; eigsh/dense ARI 1.0; lazy `__init__` exports. Outstanding: Gate 4 (init/restarts on real data), pure-deletion commit blocked on dirty `cmm.py`/`cmm_funcs.py` |
 | 4 | **DONE** — merged into row 3 | `clustering.py` absorbed from `icampsnfr/spectral.py` with `eigsh(S, which="LA")` default | vs sklearn `SpectralClustering` ARI > 0.95; solver agreement pinned (eigenvalues, subspaces, labels) |
-| 5 | `phase.py`, `wavelet.py`, `wiener_filter` | absorbed + Q1 repair | tests ported and passing; `wiener_filter` gets its first-ever tests |
-| 6 | packaging, README, CI (`metrics.py` moved to row 3) | one `pyproject.toml`, `setup.py` deleted | H2 fixed, CI green |
+| 5 | **DONE** — `phase.py`, `wavelet.py`, `cmm.wiener` | absorbed + Q1 repair | 44 new tests; phase/wavelet ported near-verbatim (sort_by_rastermap stays behind); wiener_filter repaired per Q1 (relative lam_f loading, full-grid irfft, no dask/print) with first-ever tests incl. end-to-end FIR recovery |
+| 6 | **DONE** — packaging, README, CI + `cmm.synthetic` | one `pyproject.toml`, `setup.py` deleted | H2 fixed (real deps, py>=3.10, BSD-3); ruff clean; coverage 97% on new code, 90% CI gate; README quickstart executed before committing; CI workflow authored but unverified until pushed to GitHub; broken pre-commit hook removed |
 | 7 | Update `icampsnfr` | 4 import sites patched | `icampsnfr` suite green |
-| 8 | Retire scripts | `examples/`, `archive/` deleted | — |
+| 8 | **DONE** — Retire scripts | `demos/`, `archive/` deleted; `cardio_data/`, `ependymal_data/` → `examples/` | working-tree state of every script recorded in history first; profiler artifacts gitignored, not committed |
 
 Phase 4 is the point at which the projection-matrix machinery in `utils.py` gets
 resolved: `build_fft_trial_projection_matrices` is used only by `CMM` and
