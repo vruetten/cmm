@@ -2,6 +2,8 @@ import numpy as np
 from numpy import fft as sp_fft
 from typing import Tuple
 import pandas as pd
+import tifffile as tf
+import zarr
 
 
 def load_data(data_path):
@@ -9,15 +11,18 @@ def load_data(data_path):
     if "h5" in extension:
         print("h5 data detected")
         df = pd.read_hdf(data_path, key="data")
-        xnt = np.array(df.T)
+        data = np.array(df.T)
 
-    if "npy" in extension:
+    elif "npy" in extension:
         print("numpy array detected")
-        xnt = np.load(data_path)
+        data = np.load(data_path)
+    elif "tif" in extension:
+        imzarr = tf.imread(data_path, aszarr=True)
+        data = zarr.open(imzarr, mode="r")[:]
     else:
         print(f"data format not recognized: {extension}")
         exit()
-    return xnt
+    return data
 
 
 def convert_rad_to_1(angle):
@@ -29,13 +34,6 @@ def timeit(t0):
 
     t = time() - t0
     print(f"time :{np.round(t, 5)}")
-
-
-def compute_avg_clust_dist(cluster: np.array):
-    n = cluster.shape[0]
-    clust_dist = np.abs((cluster[None] - cluster[:, None]))
-    clust_avg_dist = np.mean(clust_dist[np.triu_indices(n)])
-    return clust_avg_dist
 
 
 def compute_silhouette_proxy(coherence_mn: np.array, labels: np.array):
@@ -66,24 +64,32 @@ def compute_silhouette_proxy(coherence_mn: np.array, labels: np.array):
     return silhouette
 
 
-def compute_silhouette(coherence_nn: np.array, labels: np.array):
-    n, n = coherence_nn.shape
-    silhouette = 0
-    for ind, i in enumerate(np.unique(labels)):
-        inds = labels == i
-        ninds = labels != i
-        if sum(inds) == 0:
-            print("no elements in cluster - skip")
-        elif sum(ninds) == 0:
-            print("all elements in this cluster")
-        else:
-            inclust = coherence_nn[inds, inds].mean(-1)
-            outclust = coherence_nn[inds, ninds].mean(-1)
-            diff = outclust - inclust
-            denominator = np.max(np.vstack([inclust, outclust]), axis=0)
-            sil = (diff / denominator).mean()
-            silhouette += sil
-    return silhouette
+# def compute_silhouette(coherence_nn: np.array, labels: np.array):
+#     n, n = coherence_nn.shape
+#     silhouette = 0
+#     cohs = []
+#     for ind, i in enumerate(np.unique(labels)):
+#         cohs.append(coherence_nn[:, labels == i])
+#     cohs = np.array(cohs)
+
+
+
+#     for ind, i in enumerate(np.unique(labels)):
+#         inds = labels == i
+#         ninds = labels != i
+#         if sum(inds) == 0:
+#             print("no elements in cluster - skip")
+#         elif sum(ninds) == 0:
+#             print("all elements in this cluster")
+#         else:
+#             inclust = coherence_nn[inds, inds].mean(-1)
+#             outclust = coherence_nn[inds, ninds].mean(-1)
+#             diff = outclust - inclust
+#             denominator = np.max(np.vstack([inclust, outclust]), axis=0)
+#             sil = (diff / denominator).mean()
+#             silhouette += sil
+#     return silhouette / n
+
 
 
 def build_DFT_matrix(t, f, real=True):
@@ -142,7 +148,7 @@ def get_freqs(nperseg: int, fs: float, freq_minmax=[0, np.inf]):
 def foldxy(carry, x):
     import jax.numpy as jnp
     from jax.lax import broadcast
-
+    
     x0 = x[0]
     y0 = x[1]
     xn = x0.shape[0]
@@ -158,7 +164,6 @@ def get_fftmat(t: int, fs: 1) -> Tuple[np.array, np.array]:
     dftmtx = np.fft.fft(np.eye(t))
     freqs = np.fft.fftfreq(t, d=1 / fs)
     return dftmtx, freqs
-
 
 def make_chunks(x: np.ndarray, nperseg: int, noverlap: int):
     """rechuncks data efficiently using strides"""

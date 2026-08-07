@@ -2,6 +2,9 @@ import numpy as np
 from cmm.utils import _triage_segments, make_chunks
 from numpy import fft as sp_fft
 from cmm.utils import build_fft_trial_projection_matrices
+# import jax.numpy as jnp
+import dask.array as da
+from scipy.signal.windows import tukey
 
 
 def compute_spectral_coefs(  # used in coherence
@@ -56,23 +59,16 @@ def compute_spectral_coefs(  # used in coherence
     elif sides == "onesided":
         freqs = sp_fft.rfftfreq(nfft, 1 / fs)
 
-    if scaling == "density":
-        scale = 1.0 / (fs * (win * win).sum())
-    elif scaling == "spectrum":
-        scale = 1.0 / win.sum() ** 2
-    else:
-        raise ValueError("Unknown scaling: %r" % scaling)
 
     if detrend is False:
         detrend_func = None
     coefs_xnkf = myfft_helper(xnt, win, detrend_func, nperseg, noverlap, nfft, sides)
-    coefs_xnkf *= scale
 
     valid_freqs = (np.abs(freqs) >= freq_minmax[0]) & (np.abs(freqs) <= freq_minmax[1])
     freqs = freqs[valid_freqs]
     coefs_xnkf = coefs_xnkf[:, :, valid_freqs]
 
-    return coefs_xnkf, freqs
+    return coefs_xnkf, freqs, win
 
 
 def myfft_helper(
@@ -112,8 +108,7 @@ def myfft_helper(
         result = detrend_func(result)  # default to last axis - result is N x K x T
 
     # Apply window by multiplication
-
-    result = win * result
+    result = win * result # vmsr
 
     # Perform the fft. Acts on last axis by default. Zero-pads automatically
     if sides == "twosided":
@@ -144,6 +139,7 @@ def compute_coherence(
     alltoall=True,  # every x with every y
     y_in_coefs=False,
     x_in_coefs=False,
+    t = None,
 ):
     pxx_nk, freq = estimate_spectrum(
         xnt=xnt,
@@ -160,6 +156,7 @@ def compute_coherence(
         abs=True,
         alltoall=False,
         x_in_coefs=x_in_coefs,
+        t = t,
     )
     pyy_mk, freq = estimate_spectrum(
         xnt=ynt,
@@ -176,6 +173,7 @@ def compute_coherence(
         abs=True,
         alltoall=False,
         x_in_coefs=y_in_coefs,
+        t = t,
     )
     pxy_nmk, freq = estimate_spectrum(
         xnt=xnt,
@@ -194,9 +192,134 @@ def compute_coherence(
         alltoall=True,
         x_in_coefs=x_in_coefs,
         y_in_coefs=y_in_coefs,
+        t = t,
     )
     coherence_xyf = pxy_nmk**2 / (pxx_nk[:, None] * pyy_mk[None])
     return coherence_xyf, freq
+
+
+def estimate_wiener_r(
+    xnt: np.array,
+    ynt=None,
+    fs=1.0,
+    window="hann",
+    nperseg=None,
+    noverlap=None,
+    nfft=None,
+    scaling="spectrum",
+    detrend="constant",
+    return_onesided=True,
+    axis=-1,
+    freq_minmax=[0, np.inf],
+    alpha_reg=1e-3,           # relative diagonal loading
+    freq_taper_alpha=0.1,     # Tukey taper in frequency (0 = rectangular)
+):
+    """Estimate Wiener R"""
+
+    if len(xnt.shape) < 2:
+        xnt = xnt[None]
+    xn = xnt.shape[0]
+    coefs_xnkf, freqs, win = compute_spectral_coefs(
+        xnt=xnt,
+        fs=fs,
+        window=window,
+        nperseg=nperseg,
+        noverlap=noverlap,
+        detrend=detrend,
+        return_onesided=return_onesided,
+        scaling=scaling,
+        axis=axis,
+        freq_minmax=freq_minmax,
+        nfft=nfft,
+    )
+
+
+    if len(ynt.shape) < 2:
+        ynt = ynt[None]
+    yn = ynt.shape[0]
+    coefs_ynkf, _, _ = compute_spectral_coefs(
+        xnt=ynt,
+        fs=fs,
+        window=window,
+        nperseg=nperseg,
+        noverlap=noverlap,
+        detrend=detrend,
+        return_onesided=return_onesided,
+        scaling=scaling,
+        axis=axis,
+        freq_minmax=freq_minmax,
+        nfft=nfft,
+    )
+
+
+    wn = coefs_xnkf.shape[-1]
+    kn = coefs_xnkf.shape[1]
+    
+    coefs_xnkf = da.from_array(coefs_xnkf, chunks=("auto"))
+    coefs_ynkf = da.from_array(coefs_ynkf, chunks=("auto"))
+
+    pxy = da.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_ynkf), optimize = True)
+    pxx_diag = da.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_xnkf), optimize = True)
+    pyy_diag = da.einsum("nkf, nkf-> nf", coefs_ynkf, np.conj(coefs_ynkf), optimize = True)
+
+    U = (win**2).sum()
+    normalization_term = kn*U*fs
+    pxy /= normalization_term # X by Y by F
+    pxx_diag /= normalization_term # X by F
+    pyy_diag /= normalization_term # Y by F
+    normalization_matrix_xyf = (pxx_diag[:, None] * pyy_diag[None]) # X by Y by F
+    absPxy2 = (da.conj(pxy) * pxy).real
+
+    # ---------- KEY FIX #1: frequency-dependent regularization ----------
+    # lambda(f) = alpha * median_n Sxx(n,f)  (shape (F,))
+    lam_f = alpha_reg * da.median(pxx_diag, axis=0)              # (F,)
+    # Broadcast to (N,1,F) and add to Sxx:
+    print("alpha_reg", alpha_reg)
+    H = pxy / (pxx_diag[:, None, :] + alpha_reg)      # (N,M,F)
+
+
+    # ---------- KEY FIX #3: correct irfft length ----------
+    # One-sided rFFT length is F; the consistent time length is n_time = 2*(F-1)
+    n_time = 2 * (wn - 1) if return_onesided else wn
+    # Make sure we're passing a NumPy array to irfft (compute lazily then .compute())
+    H_np = H.compute()
+    if return_onesided:
+        h = sp_fft.irfft(H_np, n=n_time, axis=-1)
+    else:
+        h = sp_fft.ifft(H_np, n=n_time, axis=-1).real
+
+
+
+    coherence_xyf = absPxy2 / normalization_matrix_xyf # X by Y by F
+    power_weighted_coherence = absPxy2.sum(-1)/normalization_matrix_xyf.sum(-1) # X  by Y
+    wiener_r =  (coherence_xyf*pyy_diag[None]).sum(-1)/pyy_diag.sum(-1) # X  by Y
+
+    xnt_norm = (xnt - xnt.mean(-1, keepdims=True)) / xnt.std(-1, keepdims=True, ddof=0)
+    ynt_norm = (ynt - ynt.mean(-1, keepdims=True)) / ynt.std(-1, keepdims=True, ddof=0)
+    n, t = xnt.shape
+    correlation_matrix_xy = (xnt_norm@ynt_norm.T)/t
+
+    coherence_xyf = coherence_xyf.real
+    power_weighted_coherence = power_weighted_coherence.real
+    wiener_r = wiener_r.real
+
+    res = {}
+    res["coherence_xyf"] = coherence_xyf
+    res["power_weighted_coherence"] = power_weighted_coherence
+    res["wiener_r"] = wiener_r
+    res["correlation_matrix_xy"] = correlation_matrix_xy
+    res["H"] = H
+    res["h"] = h
+    res["freqs"] = freqs
+    res["pxx_diag"] = pxx_diag.real
+    res["pyy_diag"] = pyy_diag.real
+    res["pxy"] = pxy
+    
+
+
+
+    return res
+
 
 
 def estimate_spectrum(
@@ -217,7 +340,7 @@ def estimate_spectrum(
     return_coefs=False,
     y_in_coefs=False,
     x_in_coefs=False,
-    normalize_per_trial=False,
+    t = None,
 ):
     """Calculate various forms of windowed FFTs for PSD, CSD, etc.
 
@@ -282,18 +405,13 @@ def estimate_spectrum(
     result : ndarray
         Array of output data, contents dependent on *mode* kwarg.
 
-    Notes
-    -----
-    Adapted from matplotlib.mlab/scipy
-
-    .. versionadded:: 0.1.0
     """
 
     if not x_in_coefs:
         if len(xnt.shape) < 2:
             xnt = xnt[None]
         xn = xnt.shape[0]
-        coefs_xnkf, freqs = compute_spectral_coefs(
+        coefs_xnkf, freqs, win = compute_spectral_coefs(
             xnt=xnt,
             fs=fs,
             window=window,
@@ -313,12 +431,16 @@ def estimate_spectrum(
         f = coefs_xnkf.shape[-1]
         freqs = sp_fft.rfftfreq(f * 2 - 1, d=1 / fs)  # to check
 
+        win, nperseg = _triage_segments(
+        window, nperseg, input_length=t
+        )  # win is a 1d array
+
     if ynt is not None:
         if not y_in_coefs:
             if len(ynt.shape) < 2:
                 ynt = ynt[None]
             yn = ynt.shape[0]
-            coefs_ynkf, _ = compute_spectral_coefs(
+            coefs_ynkf, _, _ = compute_spectral_coefs(
                 xnt=ynt,
                 fs=fs,
                 window=window,
@@ -341,22 +463,37 @@ def estimate_spectrum(
 
     wn = coefs_xnkf.shape[-1]
     kn = coefs_xnkf.shape[1]
-
+    coefs_xnkf = da.from_array(coefs_xnkf, chunks=("auto"))
     if ynt is not None:
+        coefs_ynkf = da.from_array(coefs_ynkf, chunks=("auto"))
         if alltoall:
-            pxy = np.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_ynkf))
+            # pxy = jnp.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_ynkf))
+            pxy = da.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_ynkf), optimize = True)
         else:
-            pxy = np.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_ynkf))
+            # pxy = jnp.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_ynkf))
+            pxy = da.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_ynkf), optimize = True)
 
     else:
         if alltoall:
-            pxy = np.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_xnkf))
+            # pxy = jnp.einsum("nkf, mkf-> nmf", coefs_xnkf, np.conj(coefs_xnkf))
+            pxy = da.einsum("nkf, mkf-> nmf", coefs_xnkf, da.conj(coefs_xnkf), optimize = True)
         else:
-            pxy = np.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_xnkf))
+            # pxy = jnp.einsum("nkf, nkf-> nf", coefs_xnkf, np.conj(coefs_xnkf))
+            pxy = da.einsum("nkf, nkf-> nf", coefs_xnkf, da.conj(coefs_xnkf), optimize = True)
 
+    pxy /= (kn*(win**2).sum())
+ 
     if abs:
         pxy = np.abs(pxy).real
-    if normalize_per_trial:
-        pxy /= kn
+    if scaling == "density":
+        pxy /= fs
+    
 
-    return pxy, freqs
+        
+    if return_coefs:
+        if ynt is not None:
+            return pxy, freqs, coefs_xnkf, coefs_ynkf
+        else:
+            return pxy, freqs, coefs_xnkf
+    else:
+        return pxy, freqs
