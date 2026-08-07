@@ -111,3 +111,7 @@ ENV/
 # IDE settings
 .vscode/
 .idea/
+
+# profiler outputs from analysis scripts
+*.prof
+*.proj
