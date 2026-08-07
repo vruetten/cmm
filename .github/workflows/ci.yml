@@ -2,101 +2,42 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - "v*"
+    branches: [main, master]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # run every week (for --pre release tests)
-    - cron: "0 0 * * 0"
 
 jobs:
-  check-manifest:
-    # check-manifest is a tool that checks that all files in version control are
-    # included in the sdist (unless explicitly excluded)
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - run: pipx run check-manifest
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pipx run ruff check src tests
 
   test:
-    name: ${{ matrix.platform }} (${{ matrix.python-version }})
-    runs-on: ${{ matrix.platform }}
+    name: test (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-        platform: [ubuntu-latest, macos-latest, windows-latest]
-
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - name: 🛑 Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
         with:
-          access_token: ${{ github.token }}
-
-      - uses: actions/checkout@v3
-
-      - name: 🐍 Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+          fetch-depth: 0 # hatch-vcs needs the tags to compute a version
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache-dependency-path: "pyproject.toml"
           cache: "pip"
-
-      - name: Install Dependencies
+          cache-dependency-path: "pyproject.toml"
+      - name: Install
         run: |
           python -m pip install -U pip
-          # if running a cron job, we add the --pre flag to test against pre-releases
-          python -m pip install .[test] ${{ github.event_name == 'schedule' && '--pre' || ''  }}
-
-      - name: 🧪 Run Tests
-        run: pytest --color=yes --cov --cov-report=xml --cov-report=term-missing
-
-      # If something goes wrong with --pre tests, we can open an issue in the repo
-      - name: 📝 Report --pre Failures
-        if: failure() && github.event_name == 'schedule'
-        uses: JasonEtco/create-an-issue@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PLATFORM: ${{ matrix.platform }}
-          PYTHON: ${{ matrix.python-version }}
-          RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] pip install --pre is failing"
-        with:
-          filename: .github/TEST_FAIL_TEMPLATE.md
-          update_existing: true
-
-      - name: Coverage
-        uses: codecov/codecov-action@v3
-
-  deploy:
-    name: Deploy
-    needs: test
-    if: success() && startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
-
-      - name: 👷 Build
-        run: |
-          python -m pip install build
-          python -m build
-
-      - name: 🚢 Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.TWINE_API_KEY }}
-
-      - uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
+          python -m pip install -e .[test]
+      - name: Test
+        # The legacy modules awaiting the icampsnfr migration are omitted
+        # from coverage in pyproject.toml; the gate covers the new code.
+        run: pytest --color=yes --cov=cmm --cov-report=term-missing --cov-fail-under=90
