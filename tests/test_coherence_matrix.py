@@ -164,6 +164,27 @@ class TestMatrixProperties:
         c = coherence_matrix(dup, dtype=np.complex128).values
         assert_allclose(c[0, -1], 1.0, rtol=1e-10)
 
+    def test_single_signal_gives_a_one_by_one_identity(self, small_stft):
+        s = dataclasses.replace(small_stft, coefs=small_stft.coefs[:1])
+        c = coherence_matrix(s, dtype=np.complex128)
+        assert c.values.shape == (1, 1)
+        assert c.values[0, 0] == 1.0
+
+    def test_single_frequency_bin_reduces_to_per_bin_msc(self, small_stft):
+        # The boundary where "band-averaged" degenerates: with one bin the
+        # frequency weighting has nothing to weight, so V1 and V2 coincide
+        # and both equal the plain per-bin ratio.
+        s = dataclasses.replace(
+            small_stft,
+            coefs=small_stft.coefs[..., :1],
+            freqs=small_stft.freqs[:1],
+            onesided_factor=small_stft.onesided_factor[:1],
+        )
+        v2 = coherence_matrix(s, dtype=np.complex128).values
+        v1 = coherence_matrix(s, whiten=True, dtype=np.complex128).values
+        assert_allclose(v2, naive_v2(s.coefs), rtol=1e-10, atol=1e-12)
+        assert_allclose(v1, v2, rtol=1e-10, atol=1e-12)
+
     def test_delay_invariance(self):
         # The property that ruled out coherent averaging over frequency.
         rng = np.random.default_rng(5)
@@ -222,6 +243,15 @@ class TestBiasFloorAndDebias:
     def test_debias_rejects_bare_array_without_n_eff(self):
         with pytest.raises(ValueError, match="n_eff is required"):
             debias(np.eye(2))
+
+    def test_debias_matches_the_formula_via_bias_floor(self, small_stft):
+        # A second, independent line of defense for the K-not-K*F rule: build
+        # the expectation from the container's bias_floor property, which does
+        # not share debias()'s own n_eff resolution path.
+        c = coherence_matrix(small_stft)
+        b = c.bias_floor
+        expected = np.clip((c.values - b) / (1.0 - b), 0.0, 1.0)
+        assert_allclose(debias(c), expected, rtol=0, atol=0)
 
 
 class TestEffectiveBins:
@@ -292,9 +322,34 @@ class TestFailFast:
         assert c.n_signals == small_stft.n_signals - 1
         assert np.isfinite(c.values).all()
 
-    def test_debias_rejects_non_positive_n_eff(self):
-        with pytest.raises(ValueError, match="n_eff must be >= 1"):
-            debias(np.eye(2), n_eff=0)
+    @pytest.mark.parametrize("bad", [0, 1])
+    def test_debias_rejects_degenerate_n_eff(self, bad):
+        # n_eff=1 is not merely small: every raw coherence is trivially 1.0
+        # at a single segment, so "debiasing" it would return garbage as if
+        # it were valid output.
+        with pytest.raises(ValueError, match="n_eff must be >= 2"):
+            debias(np.eye(2), n_eff=bad)
+
+    def test_single_dead_bin_raises_not_just_a_fully_dead_signal(self, small_stft):
+        # The realistic case: a signal alive everywhere except one in-band
+        # bin. A weakened check (.any for .all) passes every other test in
+        # this file — this is the one that pins the condition's precision.
+        coefs = small_stft.coefs.copy()
+        coefs[2, :, 1] = 0.0
+        with pytest.raises(ValueError, match="zero power in at least one"):
+            coherence_matrix(dataclasses.replace(small_stft, coefs=coefs))
+
+    def test_mask_applies_the_same_per_bin_criterion(self, small_stft):
+        # Whatever finite_power_mask keeps, coherence_matrix must accept —
+        # otherwise its documented filter-then-compute workflow still raises.
+        coefs = small_stft.coefs.copy()
+        coefs[2, :, 1] = 0.0
+        s = dataclasses.replace(small_stft, coefs=coefs)
+        keep = finite_power_mask(s)
+        assert not keep[2]
+        c = coherence_matrix(dataclasses.replace(s, coefs=s.coefs[keep]))
+        assert c.n_signals == small_stft.n_signals - 1
+        assert np.isfinite(c.values).all()
 
     def test_wrong_coefficient_rank(self, small_stft):
         with pytest.raises(ValueError, match=r"expected \(N, K, F\)"):
@@ -312,6 +367,15 @@ class TestProvenance:
 
     def test_whitened_metadata_says_v1(self, small_stft):
         assert coherence_matrix(small_stft, whiten=True).metadata()["estimator"].startswith("V1")
+
+    def test_metadata_f_eff_schema_is_stable(self, small_stft):
+        # Same keys however the matrix was made, so a saved-JSON consumer
+        # never branches on compute_f_eff or whiten.
+        for kwargs in ({}, {"whiten": True}, {"compute_f_eff": False}):
+            m = coherence_matrix(small_stft, **kwargs).metadata()
+            assert set(m["f_eff"]) == {"median", "min"}
+        m = coherence_matrix(small_stft, whiten=True).metadata()
+        assert m["f_eff"]["median"] == float(small_stft.n_freqs)
 
     def test_result_is_immutable(self, small_stft):
         c = coherence_matrix(small_stft)

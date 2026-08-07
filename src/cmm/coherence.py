@@ -83,9 +83,12 @@ class CoherenceMatrix:
         return 1.0 / self.n_eff
 
     def metadata(self) -> dict:
+        # One schema regardless of how the matrix was made: a scalar f_eff
+        # (whiten=True, or compute_f_eff=False) reports itself as both median
+        # and min, so consumers never branch on the matrix's construction.
         f_eff = self.f_eff
         summary = (
-            float(f_eff)
+            {"median": float(f_eff), "min": float(f_eff)}
             if np.isscalar(f_eff)
             else {
                 "median": float(np.median(f_eff)),
@@ -103,22 +106,24 @@ class CoherenceMatrix:
 
 
 def finite_power_mask(s: Stft, *, rtol: float = 0.0) -> np.ndarray:
-    """Boolean ``(N,)`` marking signals with non-zero in-band power.
+    """Boolean ``(N,)`` marking signals with non-zero power at every in-band bin.
 
-    A signal with zero power has undefined coherence with everything, so
-    :func:`coherence_matrix` refuses to guess. Filter with this first::
+    Per bin, not in total: :func:`coherence_matrix` rejects a signal that is
+    dead at even one in-band frequency, so this mask applies the same
+    criterion — anything it keeps, ``coherence_matrix`` accepts::
 
         keep = finite_power_mask(s)
         C = coherence_matrix(replace(s, coefs=s.coefs[keep]))
 
     ``rtol`` optionally also excludes signals whose total in-band power is below
-    ``rtol`` times the median across signals — useful for imaging data where a
-    masked-out voxel is near-zero rather than exactly zero.
+    ``rtol`` times the median across the surviving signals — useful for imaging
+    data where a masked-out voxel is near-zero rather than exactly zero.
     """
-    power = np.einsum("nkf,nkf->n", s.coefs, s.coefs.conj()).real
-    ok = power > 0
+    power_nf = np.einsum("nkf,nkf->nf", s.coefs, s.coefs.conj()).real
+    ok = (power_nf > 0).all(axis=1)
     if rtol > 0 and ok.any():
-        ok &= power > rtol * np.median(power[ok])
+        total = power_nf.sum(axis=1)
+        ok &= total > rtol * np.median(total[ok])
     return ok
 
 
@@ -175,6 +180,11 @@ def coherence_matrix(
         raise ValueError("no frequency bins; check band_hz")
 
     power_nf = np.einsum("nkf,nkf->nf", coefs, coefs.conj()).real
+    # Any dead bin rejects the signal, in both modes. whiten=True genuinely
+    # requires it (the per-bin division below would emit inf); V2 could
+    # tolerate an isolated dead bin arithmetically, but accepting a signal
+    # under one estimator and rejecting it under the other would make the
+    # whiten flag silently change which inputs are valid.
     dead = ~(power_nf > 0).all(axis=1)
     if dead.any():
         raise ValueError(
@@ -214,7 +224,10 @@ def coherence_matrix(
 
     starts = range(0, n, block)
     if workers is None:
-        workers = min(32, (os.cpu_count() or 1))
+        # sched_getaffinity, not cpu_count: on a scheduler-managed node the
+        # allocation is what may be used, not the machine's core count. The
+        # cap at 32 is the measured BLAS/accumulation optimum (CLAUDE.md).
+        workers = min(32, len(os.sched_getaffinity(0)))
     if workers > 1 and len(starts) > 1:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             list(pool.map(fill, starts))
@@ -229,11 +242,16 @@ def coherence_matrix(
     out *= 0.5
     np.fill_diagonal(out, 1.0)
 
-    f_eff = effective_bins(weights_nf) if compute_f_eff else float(n_freqs)
+    # Equal weights make the participation ratio exactly F, so computing it
+    # would be two (N, F) gemms spent confirming a constant.
+    if whiten or not compute_f_eff:
+        f_eff = float(n_freqs)
+    else:
+        f_eff = effective_bins(weights_nf)
     return CoherenceMatrix(
         values=out,
         n_eff=int(s.n_segments),
-        f_eff=float(n_freqs) if whiten else f_eff,
+        f_eff=f_eff,
         whiten=whiten,
         stft_metadata=s.metadata(),
     )
@@ -254,10 +272,12 @@ def debias(c: CoherenceMatrix | np.ndarray, n_eff: int | None = None) -> np.ndar
         if n_eff is None:
             raise ValueError("n_eff is required when passing a bare array")
         values = np.asarray(c)
-    if n_eff < 1:
-        raise ValueError(f"n_eff must be >= 1, got {n_eff}")
-    if n_eff == 1:
-        return np.clip(values, 0.0, 1.0)
+    if n_eff <= 1:
+        raise ValueError(
+            f"n_eff must be >= 2 to debias, got {n_eff}: with a single "
+            "segment every raw coherence is trivially 1 and there is no bias "
+            "to remove. Use more segments (shorter nperseg or more overlap)."
+        )
     bias = 1.0 / n_eff
     return np.clip((values - bias) / (1.0 - bias), 0.0, 1.0)
 
